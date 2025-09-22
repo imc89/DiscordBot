@@ -6,44 +6,42 @@ module.exports = {
         .setDescription('Muestra la información de todos los comandos disponibles.'),
     
     async execute(interaction) {
-        // Deferir la respuesta para dar tiempo a procesar
         await interaction.deferReply();
 
-        // Puedes crear una lista de comandos directamente aquí para mayor claridad
+        // Lista de comandos organizada para una mejor visualización
         const commandsInfo = [
             {
-                name: '/law_channel <texto>',
-                description: 'Busca canales donde puedes compartir sobre un tema específico.',
+                name: '🔎 /law_channel <texto>',
+                value: 'Te ayudo a encontrar canales relevantes para el tema que busques. ¡Ideal para encontrar tu lugar en el servidor!',
             },
             {
-                name: '/law_img <@usuario>',
-                description: 'Analiza la foto de perfil de un usuario.',
+                name: '🖼️ /law_img <@usuario>',
+                value: 'Analizo la foto de perfil de un usuario.',
             },
             {
-                name: '/law_perfil <@usuario>',
-                description: 'Muestra la información de un usuario.',
+                name: '👤 /law_perfil <@usuario>',
+                value: 'Te muestro toda la información pública sobre un usuario.',
             },
             {
-                name: '/law_reglamento <@usuario>',
-                description: 'Analiza el comportamiento e infracciones de un usuario en una conversación.',
+                name: '📜 /law_reglamento <@usuario>',
+                value: 'Analizo el historial de mensajes de un usuario para ver si ha infringido alguna regla.',
             },
         ];
 
         const helpEmbed = new EmbedBuilder()
             .setColor(0x0099FF)
-            .setTitle('📖 Guía de Comandos del Bot')
-            .setDescription('Aquí tienes una lista de todos mis comandos disponibles:')
-            .setFooter({ text: '¡Usa estos comandos para interactuar conmigo!' })
+            .setTitle('📖 BOT LAWLIET: Manual de Comandos 📖')
+            .setThumbnail(interaction.client.user.displayAvatarURL())
+            .setDescription('Aquí te presento las herramientas que uso para mantener el orden. Usa mis comandos con responsabilidad.')
+            .addFields(
+                commandsInfo.map(cmd => ({
+                    name: cmd.name,
+                    value: cmd.value,
+                    inline: false,
+                }))
+            )
+            .setFooter({ text: 'Los detalles son importantes. Si necesitas ayuda con algo, simplemente pregunta al staff.' })
             .setTimestamp();
-
-        // Itera sobre la lista de información y añade un campo por cada comando
-        commandsInfo.forEach(command => {
-            helpEmbed.addFields({
-                name: `\`${command.name}\``,
-                value: command.description,
-                inline: false,
-            });
-        });
 
         await interaction.editReply({ embeds: [helpEmbed] });
     },
