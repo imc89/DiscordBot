@@ -68,7 +68,7 @@ module.exports = {
         const targetChannel = interaction.options.getChannel("canal") || interaction.channel;
 
         // Caso especial para el usuario "imc89"
-        if (targetUser.username === "imc89") {
+        if (targetUser.username === "imc89" || targetUser.username === "causlll") {
             try {
                 const imagePath = path.join(__dirname, '..', '..', 'img', 'kick.gif');
                 const file = new AttachmentBuilder(imagePath, { name: 'kick.gif' });
