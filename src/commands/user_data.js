@@ -10,7 +10,7 @@ module.exports = {
                 .setRequired(false)
         ),
     async execute(interaction) {
-        await interaction.deferReply();
+        // await interaction.deferReply();
 
         const member = interaction.options.getMember("usuario") || interaction.member;
 

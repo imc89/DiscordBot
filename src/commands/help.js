@@ -6,7 +6,7 @@ module.exports = {
         .setDescription('Muestra la información de todos los comandos disponibles.'),
     
     async execute(interaction) {
-        await interaction.deferReply();
+        // await interaction.deferReply();
 
         // Lista de comandos organizada para una mejor visualización
         const commandsInfo = [
