@@ -9,12 +9,11 @@ module.exports = {
     async execute(interaction) {
         if (!interaction.isChatInputCommand()) return;
 
-        // --- SOLUCIÓN: DIFERIR LA RESPUESTA INMEDIATAMENTE
+        // --- SOLUCIÓN: DIFERIR LA RESPUESTA INMEDIATAMENTE ANTES DE CUALQUIER OTRA COSA
         try {
             await interaction.deferReply();
         } catch (error) {
-            console.error('Error al deferir la respuesta:', error);
-            // Si la deferencia falla, no podemos hacer nada más.
+            console.error('Error al diferir la respuesta. La interacción podría haber expirado:', error);
             return;
         }
 
@@ -54,7 +53,7 @@ module.exports = {
         } catch (error) {
             console.error('Error al escribir en el archivo de registro:', error);
         }
-        
+
         // --- EJECUCIÓN DEL COMANDO
         const command = interaction.client.commands.get(interaction.commandName);
         if (!command) {
@@ -62,7 +61,6 @@ module.exports = {
         }
 
         try {
-            // Se pasa el control al comando específico
             await command.execute(interaction);
         } catch (error) {
             console.error(`Error al ejecutar el comando ${interaction.commandName}:`, error);
