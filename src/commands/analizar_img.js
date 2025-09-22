@@ -63,7 +63,7 @@ module.exports = {
                 .setTitle(`🖼️ Análisis de imagen de ${targetUser.username}`)
                 .setImage(avatarURL) // The image now appears first
                 .setColor(member.displayHexColor || "Blue")
-                .addFields({  value: text }) // The analysis text goes here
+                .addFields({ name: 'Análisis: ', value: text })
                 .setFooter({ text: "✨ Análisis de imagen potenciado por Gemini Vision" });
 
             await interaction.editReply({ embeds: [embed] });
