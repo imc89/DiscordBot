@@ -15,7 +15,7 @@ module.exports = {
                 .setRequired(false)
         ),
     async execute(interaction) {
-        // await interaction.deferReply();
+        await interaction.deferReply();
 
         const member = interaction.options.getMember("usuario") || interaction.member;
 
@@ -63,7 +63,7 @@ module.exports = {
                 .setTitle(`🖼️ Análisis de imagen de ${targetUser.username}`)
                 .setImage(avatarURL) // The image now appears first
                 .setColor(member.displayHexColor || "Blue")
-                .addFields({ name: 'Análisis: ', value: text })
+                .addFields({ name: 'Análisis:', value: text })
                 .setFooter({ text: "✨ Análisis de imagen potenciado por Gemini Vision" });
 
             await interaction.editReply({ embeds: [embed] });

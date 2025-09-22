@@ -6,8 +6,8 @@ module.exports = {
         .setDescription('Muestra la información de todos los comandos disponibles.'),
     
     async execute(interaction) {
-        // Se ha eliminado el await interaction.deferReply();
-        
+        await interaction.deferReply();
+
         // Lista de comandos organizada para una mejor visualización
         const commandsInfo = [
             {
@@ -43,7 +43,6 @@ module.exports = {
             .setFooter({ text: 'Los detalles son importantes. Si necesitas ayuda con algo, simplemente pregunta al staff.' })
             .setTimestamp();
 
-        // Se usa editReply en lugar de reply para que funcione con la deferencia del listener
         await interaction.editReply({ embeds: [helpEmbed] });
     },
 };
