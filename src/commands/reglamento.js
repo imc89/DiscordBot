@@ -58,11 +58,11 @@ module.exports = {
                 .setDescription("El canal donde se buscarán los mensajes. Por defecto, el canal actual.")
                 .addChannelTypes(ChannelType.GuildText)
                 .setRequired(false)
-        )
-        .setDefaultMemberPermissions(PermissionsBitField.Flags.ModerateMembers),
+        ),
+    // Se ha eliminado .setDefaultMemberPermissions para que el comando sea público
 
     async execute(interaction) {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ ephemeral: false }); // Cambio aquí
 
         const targetUser = interaction.options.getUser("usuario");
         const targetChannel = interaction.options.getChannel("canal") || interaction.channel;
