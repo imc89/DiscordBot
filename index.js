@@ -76,13 +76,20 @@ app.listen(port, () => {
 // ========================
 // Self-Ping to prevent sleep
 // ========================
+// ========================
+// Self-Ping to prevent sleep
+// ========================
 const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`;
 
 if (keepAliveUrl) {
     setInterval(() => {
         fetch(keepAliveUrl)
-            .then(res => console.log(`Ping successful, status: ${res.status}`))
-            .catch(err => console.error(`Ping failed: ${err.message}`));
+            .then(res => {
+                console.log(`Ping ${keepAliveUrl} exitoso, estado de respuesta: ${res.status}`);
+            })
+            .catch(err => {
+                console.error(`Ping fallido: ${err.message}`);
+            });
     }, 12 * 60 * 1000); // 12 minutes in milliseconds
 }
 
