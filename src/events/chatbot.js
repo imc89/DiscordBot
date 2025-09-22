@@ -12,7 +12,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 const chatHistories = new Map();
 
 // ID del canal donde L debe responder
-const LAWLIET_CHANNEL_ID = "1419655693614448681"; 
+const LAWLIET_CHANNEL_ID = "1419675802131234856"; 
 
 // ========================
 // Lógica de L Lawliet
