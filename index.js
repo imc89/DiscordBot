@@ -6,7 +6,7 @@ const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
-const fetch = require('node-fetch'); // <-- ADD THIS LINE
+const fetch = require('node-fetch');
 
 // ========================
 // Bot Configuration
@@ -83,16 +83,15 @@ const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`;
 
 if (keepAliveUrl) {
     setInterval(() => {
-        fetch(keepAliveUrl)
+        nodeFetch(keepAliveUrl)
             .then(res => {
                 console.log(`Ping ${keepAliveUrl} exitoso, estado de respuesta: ${res.status}`);
             })
             .catch(err => {
                 console.error(`Ping fallido: ${err.message}`);
             });
-    }, 12 * 60 * 1000); // 12 minutes in milliseconds
+    }, 12 * 60 * 1000); // 12 minutos en milisegundos
 }
-
 
 // ========================
 // Login
