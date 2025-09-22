@@ -9,13 +9,16 @@ module.exports = {
     async execute(interaction) {
         if (!interaction.isChatInputCommand()) return;
 
+        // --- SOLUCIÓN: DIFERIR LA RESPUESTA INMEDIATAMENTE
         try {
             await interaction.deferReply();
         } catch (error) {
             console.error('Error al deferir la respuesta:', error);
+            // Si la deferencia falla, no podemos hacer nada más.
             return;
         }
 
+        // --- LÓGICA DE REGISTRO
         let usageData = {};
         try {
             if (fs.existsSync(LOG_FILE)) {
@@ -47,22 +50,23 @@ module.exports = {
         
         try {
             fs.writeFileSync(LOG_FILE, JSON.stringify(usageData, null, 4), 'utf-8');
-            // Aquí se añade la línea para ver el JSON en la consola
             console.log('JSON de uso de comandos actualizado:', JSON.stringify(usageData, null, 4));
         } catch (error) {
             console.error('Error al escribir en el archivo de registro:', error);
         }
-
+        
+        // --- EJECUCIÓN DEL COMANDO
         const command = interaction.client.commands.get(interaction.commandName);
         if (!command) {
             return await interaction.editReply('Comando no encontrado.');
         }
 
         try {
+            // Se pasa el control al comando específico
             await command.execute(interaction);
         } catch (error) {
             console.error(`Error al ejecutar el comando ${interaction.commandName}:`, error);
-            await interaction.editReply('Hubo un error al ejecutar este comando.');
+            await interaction.editReply({ content: 'Hubo un error al ejecutar este comando.', ephemeral: true });
         }
     },
 };
