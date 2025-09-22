@@ -75,9 +75,6 @@ app.listen(port, () => {
 // ========================
 // Self-Ping to prevent sleep
 // ========================
-// ========================
-// Self-Ping to prevent sleep
-// ========================
 const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`;
 
 if (keepAliveUrl) {

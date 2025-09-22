@@ -7,7 +7,7 @@ const visionModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName("law_perfil")
+        .setName("law_img")
         .setDescription("Analiza la imagen de perfil de un usuario.")
         .addUserOption(option =>
             option.setName("usuario")
@@ -60,18 +60,10 @@ module.exports = {
             const text = response.text();
 
             const embed = new EmbedBuilder()
-                .setTitle(`🖼️ Análisis de perfil de ${targetUser.username}`)
+                .setTitle(`🖼️ Análisis de imagen de ${targetUser.username}`)
                 .setDescription(text)
                 .setColor(member.displayHexColor || "Blue")
-                .setThumbnail(avatarURL)
-                .addFields(
-                    { name: '👤 Usuario', value: targetUser.username, inline: true },
-                    { name: '🌐 Apodo', value: member.displayName, inline: true },
-                    { name: '🗓️ Cuenta creada', value: `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:R>`, inline: true },
-                    { name: '🗓️ Se unió al servidor', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`, inline: true },
-                    { name: '⭐ Es un bot?', value: targetUser.bot ? 'Sí' : 'No', inline: false },
-                    { name: '👑 Roles', value: member.roles.cache.map(role => role.name).join(', ') || 'Ninguno' }
-                )
+                .setImage(avatarURL)
                 .setFooter({ text: "✨ Análisis de imagen potenciado por Gemini Vision" });
 
             await interaction.editReply({ embeds: [embed] });

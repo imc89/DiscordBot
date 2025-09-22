@@ -19,7 +19,7 @@ module.exports = {
                 value: 'Analizo la foto de perfil de un usuario.',
             },
             {
-                name: '👤 /law_perfil <@usuario>',
+                name: '👤 /law_data <@usuario>',
                 value: 'Te muestro toda la información pública sobre un usuario.',
             },
             {
