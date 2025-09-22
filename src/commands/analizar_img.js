@@ -61,9 +61,9 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setTitle(`🖼️ Análisis de imagen de ${targetUser.username}`)
+                .setImage(avatarURL)
                 .setDescription(text)
                 .setColor(member.displayHexColor || "Blue")
-                .setImage(avatarURL)
                 .setFooter({ text: "✨ Análisis de imagen potenciado por Gemini Vision" });
 
             await interaction.editReply({ embeds: [embed] });
