@@ -1,11 +1,12 @@
-// index.js (with Express Server for Render)
+// index.js (with Self-Ping Loop for Render)
 
 // Importa las librerías necesarias de Node.js.
 require("dotenv").config();
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const path = require('path');
 const fs = require('fs');
-const express = require('express'); // <-- ADD THIS LINE
+const express = require('express');
+const fetch = require('node-fetch'); // <-- ADD THIS LINE
 
 // ========================
 // Bot Configuration
@@ -71,6 +72,20 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Web server is listening on port ${port}`);
 });
+
+// ========================
+// Self-Ping to prevent sleep
+// ========================
+const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`;
+
+if (keepAliveUrl) {
+    setInterval(() => {
+        fetch(keepAliveUrl)
+            .then(res => console.log(`Ping successful, status: ${res.status}`))
+            .catch(err => console.error(`Ping failed: ${err.message}`));
+    }, 12 * 60 * 1000); // 12 minutes in milliseconds
+}
+
 
 // ========================
 // Login
