@@ -23,7 +23,7 @@ module.exports = {
                 value: 'Te muestro toda la información pública sobre un usuario.',
             },
             {
-                name: '📜 /law_reglamento <@usuario>',
+                name: '📜 /law_reglamento <@usuario> <canal_donde_analizar>',
                 value: 'Analizo el historial de mensajes de un usuario para ver si ha infringido alguna regla.',
             },
         ];
