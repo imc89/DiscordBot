@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require("discord.js");
 
-// Función para parsear el tiempo
 const parseTime = (timeString) => {
     const timeRegex = /^(\d+)([smhd])$/;
     const match = timeString.match(timeRegex);
@@ -47,12 +46,10 @@ module.exports = {
                 .setDescription("La razón del silencio.")
                 .setRequired(true)
         ),
-    // Esto asegura que solo los miembros con permiso de moderar puedan ver y usar el comando
-    // Alternativamente, puedes usar .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageRoles)
     async execute(interaction) {
         // Validación de permisos del usuario que ejecuta el comando
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-            return await interaction.editReply({
+            return await interaction.reply({
                 content: "⚠️ No tienes permiso para usar este comando.",
                 ephemeral: true
             });
@@ -66,17 +63,17 @@ module.exports = {
         // Validaciones del bot y del usuario objetivo
         const botMember = await interaction.guild.members.fetch(interaction.client.user.id);
         if (member.id === interaction.client.user.id) {
-            return await interaction.editReply({ content: "🚫 No puedo silenciarme a mí mismo.", ephemeral: true });
+            return await interaction.reply({ content: "🚫 No puedo silenciarme a mí mismo.", ephemeral: true });
         }
         if (member.id === interaction.guild.ownerId) {
-            return await interaction.editReply({ content: "🚫 No puedes silenciar al dueño del servidor.", ephemeral: true });
+            return await interaction.reply({ content: "🚫 No puedes silenciar al dueño del servidor.", ephemeral: true });
         }
         if (member.roles.highest.position >= botMember.roles.highest.position) {
-            return await interaction.editReply({ content: "⚠️ No puedo silenciar a este usuario porque tiene un rol igual o superior al mío.", ephemeral: true });
+            return await interaction.reply({ content: "⚠️ No puedo silenciar a este usuario porque tiene un rol igual o superior al mío.", ephemeral: true });
         }
 
         if (timeInMs === null) {
-            return await interaction.editReply({
+            return await interaction.reply({
                 content: "⚠️ El formato de tiempo no es válido. Usa 's' para segundos, 'm' para minutos, 'h' para horas o 'd' para días (ej: 10m).",
                 ephemeral: true
             });
@@ -116,11 +113,11 @@ module.exports = {
                 .setColor('Green')
                 .setTimestamp();
 
-            await interaction.editReply({ embeds: [replyEmbed] });
+            await interaction.reply({ embeds: [replyEmbed] });
 
         } catch (error) {
             console.error("Error al silenciar al usuario:", error);
-            await interaction.editReply({
+            await interaction.reply({
                 content: "⚠️ Ocurrió un error al intentar silenciar al usuario. Revisa los permisos del bot.",
                 ephemeral: true
             });
