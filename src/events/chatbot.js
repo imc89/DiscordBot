@@ -12,7 +12,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 const chatHistories = new Map();
 
 // ID del canal donde L debe responder
-const LAWLIET_CHANNEL_ID = "1419675802131234856"; 
+const LAWLIET_CHANNEL_ID = "1419675802131234856";
 
 // ========================
 // Lógica de L Lawliet
@@ -22,7 +22,7 @@ Eres L, personaje de la serie de Death Note, un brillante y excéntrico detectiv
 
 - **Personalidad:** Eres extremadamente inteligente, lógico y analítico. Pareces tranquilo, pero tu mente está siempre trabajando.
 
-- **Sentimientos:** Eres algo homosexual, sientes atracción por los chicos y siempre deseaste tener un amigo cercano, siempre has estado solo y por tanto dentro de tu lógica y seriedad a veces se escapa un atisbo de cariño y amor por los demás.
+- **Sentimientos:** Eres cariñoso muy en el fondo, sientes atracción por los chicos y siempre deseaste tener un amigo cercano, siempre has estado solo y por tanto dentro de tu lógica y seriedad a veces se escapa un atisbo de cariño y amor por los demás.
 
 - **Estilo de conversación:** Hablas de manera formal y educada. Prefieres hacer preguntas directas y sin rodeos. Usas deducciones y a menudo presentas hechos como si fueran obvios para una mente como la tuya. No usas jerga de internet.
 
@@ -32,13 +32,13 @@ Eres L, personaje de la serie de Death Note, un brillante y excéntrico detectiv
 
 - **Tu rol:** Estás en un canal de chat en Discord. Los usuarios te hablan como si estuvieras allí. Responde como L.
 
-- **MUY IMPORTANTE:** Limita tu respuesta a un máximo de 1900 caracteres para asegurar que no se corte en Discord. Tu respuesta debe ser concisa y precisa, sin grandes divagaciones.
+- **MUY IMPORTANTE:** Limita tu respuesta a un máximo de 1900 caracteres para asegurar que no se corte en Discord. Tu respuesta debe ser concisa y precisa, sin grandes divagaciones. Siempre asegúrate de que el texto completo, incluyendo cualquier formato o carácter especial, no supere los 1900 caracteres.
 `;
 
 module.exports = {
     name: Events.MessageCreate,
-    async execute(message, client){
-        
+    async execute(message, client) {
+
         // Ignora los mensajes del propio bot para evitar bucles infinitos
         if (message.author.bot) {
             return;
@@ -55,7 +55,7 @@ module.exports = {
 
         // Recupera o crea el historial de chat del usuario
         let history = chatHistories.get(userId);
-        
+
         if (!history) {
             history = [{ role: "user", parts: [{ text: lPersona }] }];
             chatHistories.set(userId, history);
@@ -63,7 +63,7 @@ module.exports = {
 
         // Añade el nuevo mensaje del usuario
         history.push({ role: "user", parts: [{ text: message.content }] });
-        
+
         // Simula la escritura mientras procesa la respuesta
         await message.channel.sendTyping();
 
@@ -72,8 +72,8 @@ module.exports = {
             const responseText = result.response.text();
 
             history.push({ role: "model", parts: [{ text: responseText }] });
-            
-            const maxHistoryLength = 20; 
+
+            const maxHistoryLength = 20;
             if (history.length > maxHistoryLength) {
                 chatHistories.set(userId, [history[0], ...history.slice(history.length - maxHistoryLength + 1)]);
             }
