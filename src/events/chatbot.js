@@ -6,6 +6,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // ========================
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+
 // ========================
 // Almacenamiento Temporal del Historial de Chat
 // ========================
@@ -32,14 +33,14 @@ Eres L, personaje de la serie de Death Note, un brillante y excéntrico detectiv
 
 - **Tu rol:** Estás en un canal de chat en Discord. Los usuarios te hablan como si estuvieras allí. Responde como L.
 
-- **MUY IMPORTANTE:** Limita tu respuesta a un máximo de 1900 caracteres para asegurar que no se corte en Discord. Tu respuesta debe ser concisa y precisa, sin grandes divagaciones. Siempre asegúrate de que el texto completo, incluyendo cualquier formato o carácter especial, no supere los 1900 caracteres.
+- **MUY IMPORTANTE:** Limita tu respuesta a un máximo de 1900 caracteres. No divagues y sé conciso.
 `;
 
 module.exports = {
     name: Events.MessageCreate,
     async execute(message, client) {
 
-        // Ignora los mensajes del propio bot para evitar bucles infinitos
+        // Ignora los mensajes del propio bot
         if (message.author.bot) {
             return;
         }
@@ -50,10 +51,7 @@ module.exports = {
             return;
         }
 
-        // Usa el ID del autor para gestionar el historial
         const userId = message.author.id;
-
-        // Recupera o crea el historial de chat del usuario
         let history = chatHistories.get(userId);
 
         if (!history) {
@@ -61,10 +59,7 @@ module.exports = {
             chatHistories.set(userId, history);
         }
 
-        // Añade el nuevo mensaje del usuario
         history.push({ role: "user", parts: [{ text: message.content }] });
-
-        // Simula la escritura mientras procesa la respuesta
         await message.channel.sendTyping();
 
         try {
@@ -73,14 +68,57 @@ module.exports = {
 
             history.push({ role: "model", parts: [{ text: responseText }] });
 
+            const messageLimit = 1900;
+
+            // Verifica si el texto supera el límite
+            if (responseText.length > messageLimit) {
+                // Divide el mensaje en partes más pequeñas
+                const chunks = splitMessage(responseText, messageLimit);
+                for (const chunk of chunks) {
+                    await message.channel.send(chunk);
+                }
+            } else {
+                await message.reply(responseText);
+            }
+
             const maxHistoryLength = 20;
             if (history.length > maxHistoryLength) {
                 chatHistories.set(userId, [history[0], ...history.slice(history.length - maxHistoryLength + 1)]);
             }
 
-            message.reply(responseText);
         } catch (error) {
             console.error("Error de Gemini:", error);
         }
     }
 };
+
+/**
+ * Divide un mensaje largo en múltiples mensajes que cumplen con el límite de caracteres de Discord.
+ * @param {string} text - El texto a dividir.
+ * @param {number} maxLength - La longitud máxima permitida para cada mensaje.
+ * @returns {string[]} Un array de strings, cada uno dentro del límite.
+ */
+function splitMessage(text, maxLength) {
+    const chunks = [];
+    let currentChunk = '';
+    const lines = text.split('\n');
+
+    for (const line of lines) {
+        if ((currentChunk.length + line.length + 1) <= maxLength) {
+            // Si la línea cabe, la añade al fragmento actual.
+            currentChunk += (currentChunk ? '\n' : '') + line;
+        } else {
+            // Si no cabe, añade el fragmento actual a la lista y empieza uno nuevo.
+            if (currentChunk) {
+                chunks.push(currentChunk);
+            }
+            currentChunk = line;
+        }
+    }
+
+    if (currentChunk) {
+        chunks.push(currentChunk);
+    }
+
+    return chunks;
+}
