@@ -5,7 +5,6 @@ const path = require("path");
 const moneyFile = path.join(__dirname, "money.json");
 
 // Define los IDs de los usuarios que pueden usar el comando de gestión
-// Reemplaza estos IDs con los reales de imc89 y caus1
 const allowedUsers = ['852486349520371744', '1056942076480204801'];
 
 // Función para leer el archivo JSON
@@ -25,11 +24,11 @@ async function writeMoneyFile(data) {
 
 // Array con mensajes y recompensas para el comando de trabajo
 const jobRewards = [
-    { message: "Has encontrado **{amount}**$ perdidas. ¡Qué suerte!", amount: 50 },
-    { message: "Por un pequeño trabajo te han dado **{amount}**$.", amount: 125 },
-    { message: "Ayudaste a un bot a resolver un problema técnico y te recompensó con **{amount}**$.", amount: 75 },
-    { message: "Has limpiado los canales de spam y te han pagado **{amount}**$.", amount: 100 },
-    { message: "Un usuario te pagó **{amount}**$ por un buen consejo.", amount: 60 },
+    { message: "Has encontrado **{amount}** monedas perdidas. ¡Qué suerte!", amount: 50 },
+    { message: "Por un pequeño trabajo te han dado **{amount}** monedas.", amount: 125 },
+    { message: "Ayudaste a un bot a resolver un problema técnico y te recompensó con **{amount}** monedas.", amount: 75 },
+    { message: "Has limpiado los canales de spam y te han pagado **{amount}** monedas.", amount: 100 },
+    { message: "Un usuario te pagó **{amount}** monedas por un buen consejo.", amount: 60 },
 ];
 
 module.exports = {
@@ -90,7 +89,14 @@ module.exports = {
 
         // Si el usuario no existe en la base de datos, lo inicializamos
         if (!moneyData[userId]) {
-            moneyData[userId] = { balance: 0, last_daily: null, last_job: null };
+            // AHORA guardamos el nombre de usuario y el apodo junto con el resto de datos.
+            moneyData[userId] = {
+                username: interaction.user.username,
+                displayName: interaction.user.displayName,
+                balance: 0,
+                last_daily: null,
+                last_job: null
+            };
             await writeMoneyFile(moneyData);
         }
 
@@ -162,13 +168,19 @@ module.exports = {
             const targetId = user.id;
 
             let balance = 0;
+            let usernameToDisplay = user.displayName; // Usamos el apodo para mostrar
+
             if (moneyData[targetId]) {
                 balance = moneyData[targetId].balance;
+                // Si la base de datos contiene un nombre, lo usamos por si el usuario se ha cambiado de nombre
+                if (moneyData[targetId].displayName) {
+                    usernameToDisplay = moneyData[targetId].displayName;
+                }
             }
 
             const embed = new EmbedBuilder()
                 .setTitle("💰 Balance de Monedas")
-                .setDescription(`El balance de **${user.username}** es de **${balance}** monedas.`)
+                .setDescription(`El balance de **${usernameToDisplay}** es de **${balance}** monedas.`)
                 .setColor("Green")
                 .setTimestamp();
 
@@ -198,17 +210,27 @@ module.exports = {
                 const userToEdit = interaction.options.getUser("usuario");
                 const newAmount = interaction.options.getInteger("cantidad");
 
-                // Si el usuario a editar no existe, lo inicializamos
+                // Si el usuario a editar no existe, lo inicializamos con el nombre y apodo actuales
                 if (!moneyData[userToEdit.id]) {
-                    moneyData[userToEdit.id] = { balance: 0, last_daily: null, last_job: null };
+                    moneyData[userToEdit.id] = { 
+                        username: userToEdit.username,
+                        displayName: userToEdit.displayName,
+                        balance: 0, 
+                        last_daily: null, 
+                        last_job: null 
+                    };
                 }
 
+                // Actualizamos el balance y el nombre/apodo por si han cambiado
                 moneyData[userToEdit.id].balance = newAmount;
+                moneyData[userToEdit.id].username = userToEdit.username;
+                moneyData[userToEdit.id].displayName = userToEdit.displayName;
+                
                 await writeMoneyFile(moneyData);
 
                 const embed = new EmbedBuilder()
                     .setTitle("✏️ Balance Editado")
-                    .setDescription(`El balance de **${userToEdit.username}** ha sido actualizado a **${newAmount}** monedas.`)
+                    .setDescription(`El balance de **${userToEdit.displayName}** ha sido actualizado a **${newAmount}** monedas.`)
                     .setColor("DarkBlue")
                     .setTimestamp();
 
