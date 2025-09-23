@@ -4,6 +4,10 @@ const path = require("path");
 
 const moneyFile = path.join(__dirname, "money.json");
 
+// Define los IDs de los usuarios que pueden usar el comando de gestión
+// Reemplaza estos IDs con los reales de imc89 y caus1
+const allowedUsers = ['852486349520371744', '1056942076480204801'];
+
 // Función para leer el archivo JSON
 async function readMoneyFile() {
     try {
@@ -21,11 +25,11 @@ async function writeMoneyFile(data) {
 
 // Array con mensajes y recompensas para el comando de trabajo
 const jobRewards = [
-    { message: "Has encontrado **{amount}** monedas perdidas. ¡Qué suerte!", amount: 50 },
-    { message: "Por un pequeño trabajo te han dado **{amount}** monedas.", amount: 125 },
-    { message: "Ayudaste a un bot a resolver un problema técnico y te recompensó con **{amount}** monedas.", amount: 75 },
-    { message: "Has limpiado los canales de spam y te han pagado **{amount}** monedas.", amount: 100 },
-    { message: "Un usuario te pagó **{amount}** monedas por un buen consejo.", amount: 60 },
+    { message: "Has encontrado **{amount}**$ perdidas. ¡Qué suerte!", amount: 50 },
+    { message: "Por un pequeño trabajo te han dado **{amount}**$.", amount: 125 },
+    { message: "Ayudaste a un bot a resolver un problema técnico y te recompensó con **{amount}**$.", amount: 75 },
+    { message: "Has limpiado los canales de spam y te han pagado **{amount}**$.", amount: 100 },
+    { message: "Un usuario te pagó **{amount}**$ por un buen consejo.", amount: 60 },
 ];
 
 module.exports = {
@@ -51,9 +55,35 @@ module.exports = {
             subcommand
                 .setName('job')
                 .setDescription('Realiza un pequeño trabajo para ganar dinero.')
+        )
+        .addSubcommandGroup(group =>
+            group
+                .setName('manage')
+                .setDescription('Comandos de gestión del dinero (solo para admins).')
+                .addSubcommand(subcommand =>
+                    subcommand
+                        .setName('view')
+                        .setDescription('Ver el contenido del archivo money.json.')
+                )
+                .addSubcommand(subcommand =>
+                    subcommand
+                        .setName('edit')
+                        .setDescription('Editar el balance de un usuario.')
+                        .addUserOption(option =>
+                            option.setName("usuario")
+                                .setDescription("El usuario cuyo balance quieres editar.")
+                                .setRequired(true)
+                        )
+                        .addIntegerOption(option =>
+                            option.setName("cantidad")
+                                .setDescription("La nueva cantidad de monedas.")
+                                .setRequired(true)
+                        )
+                )
         ),
 
     async execute(interaction) {
+        const subcommandGroup = interaction.options.getSubcommandGroup();
         const subcommand = interaction.options.getSubcommand();
         const userId = interaction.user.id;
         let moneyData = await readMoneyFile();
@@ -143,6 +173,47 @@ module.exports = {
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
+
+        } else if (subcommandGroup === 'manage') {
+            // Comprobación de permisos
+            if (!allowedUsers.includes(userId)) {
+                return await interaction.reply({
+                    content: "❌ No tienes permiso para usar este comando de gestión.",
+                    ephemeral: true
+                });
+            }
+
+            if (subcommand === 'view') {
+                const fileContent = JSON.stringify(moneyData, null, 2);
+                
+                const embed = new EmbedBuilder()
+                    .setTitle("📁 Contenido de `money.json`")
+                    .setDescription(`\`\`\`json\n${fileContent}\n\`\`\``)
+                    .setColor("Blurple")
+                    .setTimestamp();
+                
+                await interaction.reply({ embeds: [embed] });
+
+            } else if (subcommand === 'edit') {
+                const userToEdit = interaction.options.getUser("usuario");
+                const newAmount = interaction.options.getInteger("cantidad");
+
+                // Si el usuario a editar no existe, lo inicializamos
+                if (!moneyData[userToEdit.id]) {
+                    moneyData[userToEdit.id] = { balance: 0, last_daily: null, last_job: null };
+                }
+
+                moneyData[userToEdit.id].balance = newAmount;
+                await writeMoneyFile(moneyData);
+
+                const embed = new EmbedBuilder()
+                    .setTitle("✏️ Balance Editado")
+                    .setDescription(`El balance de **${userToEdit.username}** ha sido actualizado a **${newAmount}** monedas.`)
+                    .setColor("DarkBlue")
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [embed] });
+            }
         }
     },
 };
