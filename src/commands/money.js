@@ -23,12 +23,18 @@ async function writeMoneyFile(data) {
 }
 
 // Array con mensajes y recompensas para el comando de trabajo
+// Ahora incluye múltiples opciones para perder dinero
 const jobRewards = [
-    { message: "Has encontrado **{amount}** monedas perdidas. ¡Qué suerte!", amount: 50 },
-    { message: "Por un pequeño trabajo te han dado **{amount}** monedas.", amount: 125 },
-    { message: "Ayudaste a un bot a resolver un problema técnico y te recompensó con **{amount}** monedas.", amount: 75 },
-    { message: "Has limpiado los canales de spam y te han pagado **{amount}** monedas.", amount: 100 },
-    { message: "Un usuario te pagó **{amount}** monedas por un buen consejo.", amount: 60 },
+    { message: "Has encontrado **{amount}**$ perdidas. ¡Qué suerte!", amount: 50 },
+    { message: "Por un pequeño trabajo te han dado **{amount}**$.", amount: 125 },
+    { message: "Ayudaste a un bot a resolver un problema técnico y te recompensó con **{amount}**$.", amount: 75 },
+    { message: "Has limpiado los canales de spam y te han pagado **{amount}**$.", amount: 100 },
+    { message: "Un usuario te pagó **{amount}**$ por un buen consejo.", amount: 60 },
+    
+    // --- Opciones de pérdida ---
+    { message: "Tu trabajo salió mal y has tenido que pagar una multa de **{amount}**$.", amount: -40 },
+    { message: "Mientras trabajabas, causaste un accidente y perdiste **{amount}**$ para reparaciones.", amount: -75 },
+    { message: "Te robaron algunas ganancias. Has perdido **{amount}**$.", amount: -100 },
 ];
 
 module.exports = {
@@ -53,7 +59,23 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('job')
-                .setDescription('Realiza un pequeño trabajo para ganar dinero.')
+                .setDescription('Realiza un pequeño trabajo para ganar o perder dinero.')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('transfer')
+                .setDescription('Transfiere dinero a otro usuario.')
+                .addUserOption(option =>
+                    option.setName('usuario')
+                        .setDescription('El usuario al que quieres transferir dinero.')
+                        .setRequired(true)
+                )
+                .addIntegerOption(option =>
+                    option.setName('cantidad')
+                        .setDescription('La cantidad de monedas a transferir.')
+                        .setRequired(true)
+                        .setMinValue(1)
+                )
         )
         .addSubcommandGroup(group =>
             group
@@ -87,9 +109,7 @@ module.exports = {
         const userId = interaction.user.id;
         let moneyData = await readMoneyFile();
 
-        // Si el usuario no existe en la base de datos, lo inicializamos
         if (!moneyData[userId]) {
-            // AHORA guardamos el nombre de usuario y el apodo junto con el resto de datos.
             moneyData[userId] = {
                 username: interaction.user.username,
                 displayName: interaction.user.displayName,
@@ -132,7 +152,7 @@ module.exports = {
         } else if (subcommand === 'job') {
             const lastJob = moneyData[userId].last_job;
             const now = new Date();
-            const jobCooldownInMs = 2 * 60 * 60 * 1000; // Cooldown de 2 horas
+            const jobCooldownInMs = 2 * 60 * 60 * 1000;
 
             if (lastJob && (now.getTime() - new Date(lastJob).getTime()) < jobCooldownInMs) {
                 const timeLeft = jobCooldownInMs - (now.getTime() - new Date(lastJob).getTime());
@@ -152,13 +172,13 @@ module.exports = {
             await writeMoneyFile(moneyData);
 
             const embed = new EmbedBuilder()
-                .setTitle("💼 Trabajo Completado")
-                .setDescription(randomReward.message.replace('{amount}', jobReward))
+                .setTitle("💼 Resultado del Trabajo")
+                .setDescription(randomReward.message.replace('{amount}', Math.abs(jobReward)))
                 .addFields({
                     name: 'Balance Actual',
                     value: `Tu nuevo balance es de **${moneyData[userId].balance}** monedas.`,
                 })
-                .setColor("Orange")
+                .setColor(jobReward >= 0 ? "Orange" : "Red")
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
@@ -168,13 +188,12 @@ module.exports = {
             const targetId = user.id;
 
             let balance = 0;
-            let usernameToDisplay = user.displayName; // Usamos el apodo para mostrar
+            let usernameToDisplay = user.displayName;
 
             if (moneyData[targetId]) {
                 balance = moneyData[targetId].balance;
-                // Si la base de datos contiene un nombre, lo usamos por si el usuario se ha cambiado de nombre
                 if (moneyData[targetId].displayName) {
-                    usernameToDisplay = moneyData[targetId].displayName;
+                    usernameToDisplay = moneyData[target-d].displayName;
                 }
             }
 
@@ -186,8 +205,50 @@ module.exports = {
 
             await interaction.reply({ embeds: [embed] });
 
+        } else if (subcommand === 'transfer') {
+            const recipientUser = interaction.options.getUser("usuario");
+            const amount = interaction.options.getInteger("cantidad");
+
+            if (userId === recipientUser.id) {
+                return await interaction.reply({
+                    content: "❌ No puedes transferir dinero a ti mismo.",
+                    ephemeral: true
+                });
+            }
+
+            if (moneyData[userId].balance < amount) {
+                return await interaction.reply({
+                    content: `❌ No tienes suficientes monedas para transferir **${amount}**. Tu balance actual es de **${moneyData[userId].balance}** monedas.`,
+                    ephemeral: true
+                });
+            }
+
+            if (!moneyData[recipientUser.id]) {
+                moneyData[recipientUser.id] = {
+                    username: recipientUser.username,
+                    displayName: recipientUser.displayName,
+                    balance: 0,
+                    last_daily: null,
+                    last_job: null
+                };
+            }
+
+            moneyData[userId].balance -= amount;
+            moneyData[recipientUser.id].balance += amount;
+            await writeMoneyFile(moneyData);
+
+            const embed = new EmbedBuilder()
+                .setTitle("💸 Transferencia Exitosa")
+                .setDescription(`Has transferido **${amount}** monedas a **${recipientUser.displayName}**.`)
+                .addFields(
+                    { name: 'Tu nuevo balance', value: `**${moneyData[userId].balance}** monedas.`, inline: true },
+                    { name: 'Balance del receptor', value: `**${moneyData[recipientUser.id].balance}** monedas.`, inline: true }
+                )
+                .setColor("Blue")
+                .setTimestamp();
+
+            await interaction.reply({ embeds: [embed] });
         } else if (subcommandGroup === 'manage') {
-            // Comprobación de permisos
             if (!allowedUsers.includes(userId)) {
                 return await interaction.reply({
                     content: "❌ No tienes permiso para usar este comando de gestión.",
@@ -210,7 +271,6 @@ module.exports = {
                 const userToEdit = interaction.options.getUser("usuario");
                 const newAmount = interaction.options.getInteger("cantidad");
 
-                // Si el usuario a editar no existe, lo inicializamos con el nombre y apodo actuales
                 if (!moneyData[userToEdit.id]) {
                     moneyData[userToEdit.id] = { 
                         username: userToEdit.username,
@@ -221,7 +281,6 @@ module.exports = {
                     };
                 }
 
-                // Actualizamos el balance y el nombre/apodo por si han cambiado
                 moneyData[userToEdit.id].balance = newAmount;
                 moneyData[userToEdit.id].username = userToEdit.username;
                 moneyData[userToEdit.id].displayName = userToEdit.displayName;
