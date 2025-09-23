@@ -32,7 +32,7 @@ module.exports = {
 
         try {
             const auditLogs = await guild.fetchAuditLogs({
-                limit: 20, // Cantidad de entradas a buscar
+                limit: 100, // Cantidad de entradas a buscar
             });
 
             const userLogs = auditLogs.entries.filter(entry => entry.target.id === targetUser.id);
