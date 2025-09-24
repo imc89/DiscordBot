@@ -5,7 +5,7 @@ const { MongoClient } = require("mongodb");
 const allowedUsers = ['852486349520371744', '1056942076480204801'];
 
 // Configura tu cadena de conexión a MongoDB
-const uri = `mongodb+srv://${DB_USER}:${DB_PASS}@${DB_HOST}/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_HOST}/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri);
 
 // Array con mensajes y recompensas para el comando de trabajo
