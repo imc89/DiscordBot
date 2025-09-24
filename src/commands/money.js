@@ -1,37 +1,20 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const fs = require("fs").promises;
-const path = require("path");
-
-const moneyFile = path.join(__dirname, "money.json");
+const { MongoClient } = require("mongodb");
 
 // Define los IDs de los usuarios que pueden usar el comando de gestión
 const allowedUsers = ['852486349520371744', '1056942076480204801'];
 
-// Función para leer el archivo JSON
-async function readMoneyFile() {
-    try {
-        const data = await fs.readFile(moneyFile, "utf8");
-        return JSON.parse(data);
-    } catch (error) {
-        return {};
-    }
-}
-
-// Función para escribir en el archivo JSON
-async function writeMoneyFile(data) {
-    await fs.writeFile(moneyFile, JSON.stringify(data, null, 2));
-}
+// Configura tu cadena de conexión a MongoDB
+const uri = "mongodb+srv://psicosofia:HRPDHTEw7H14hJVu@cluster0.abcde.mongodb.net/?retryWrites=true&w=majority";
+const client = new MongoClient(uri);
 
 // Array con mensajes y recompensas para el comando de trabajo
-// Ahora incluye múltiples opciones para perder dinero
 const jobRewards = [
     { message: "Has encontrado **{amount}**$ perdidas. ¡Qué suerte!", amount: 50 },
     { message: "Por un pequeño trabajo te han dado **{amount}**$.", amount: 125 },
     { message: "Ayudaste a un bot a resolver un problema técnico y te recompensó con **{amount}**$.", amount: 75 },
     { message: "Has limpiado los canales de spam y te han pagado **{amount}**$.", amount: 100 },
     { message: "Un usuario te pagó **{amount}**$ por un buen consejo.", amount: 60 },
-    
-    // --- Opciones de pérdida ---
     { message: "Tu trabajo salió mal y has tenido que pagar una multa de **{amount}**$.", amount: -40 },
     { message: "Mientras trabajabas, causaste un accidente y perdiste **{amount}**$ para reparaciones.", amount: -75 },
     { message: "Te robaron algunas ganancias. Has perdido **{amount}**$.", amount: -100 },
@@ -104,24 +87,30 @@ module.exports = {
         ),
 
     async execute(interaction) {
+        await client.connect();
+        const db = client.db("discord_bot"); // Puedes nombrar tu base de datos como quieras
+        const collection = db.collection("users"); // Colección para guardar los datos de los usuarios
+
         const subcommandGroup = interaction.options.getSubcommandGroup();
         const subcommand = interaction.options.getSubcommand();
         const userId = interaction.user.id;
-        let moneyData = await readMoneyFile();
+        
+        let userData = await collection.findOne({ userId });
 
-        if (!moneyData[userId]) {
-            moneyData[userId] = {
+        if (!userData) {
+            userData = {
+                userId,
                 username: interaction.user.username,
                 displayName: interaction.user.displayName,
                 balance: 0,
                 last_daily: null,
                 last_job: null
             };
-            await writeMoneyFile(moneyData);
+            await collection.insertOne(userData);
         }
 
         if (subcommand === 'daily') {
-            const lastDaily = moneyData[userId].last_daily;
+            const lastDaily = userData.last_daily;
             const now = new Date();
             const oneDayInMs = 24 * 60 * 60 * 1000;
 
@@ -137,20 +126,22 @@ module.exports = {
             }
 
             const dailyReward = 200;
-            moneyData[userId].balance += dailyReward;
-            moneyData[userId].last_daily = now.toISOString();
-            await writeMoneyFile(moneyData);
+            const newBalance = userData.balance + dailyReward;
+            await collection.updateOne(
+                { userId }, 
+                { $set: { balance: newBalance, last_daily: now.toISOString() } }
+            );
 
             const embed = new EmbedBuilder()
                 .setTitle("🎁 Recompensa Diaria")
-                .setDescription(`Has reclamado tu recompensa de **${dailyReward}** monedas. Tu nuevo balance es de **${moneyData[userId].balance}** monedas.`)
+                .setDescription(`Has reclamado tu recompensa de **${dailyReward}** monedas. Tu nuevo balance es de **${newBalance}** monedas.`)
                 .setColor("Gold")
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
             
         } else if (subcommand === 'job') {
-            const lastJob = moneyData[userId].last_job;
+            const lastJob = userData.last_job;
             const now = new Date();
             const jobCooldownInMs = 2 * 60 * 60 * 1000;
 
@@ -167,16 +158,18 @@ module.exports = {
 
             const randomReward = jobRewards[Math.floor(Math.random() * jobRewards.length)];
             const jobReward = randomReward.amount;
-            moneyData[userId].balance += jobReward;
-            moneyData[userId].last_job = now.toISOString();
-            await writeMoneyFile(moneyData);
+            const newBalance = userData.balance + jobReward;
+            await collection.updateOne(
+                { userId }, 
+                { $set: { balance: newBalance, last_job: now.toISOString() } }
+            );
 
             const embed = new EmbedBuilder()
                 .setTitle("💼 Resultado del Trabajo")
                 .setDescription(randomReward.message.replace('{amount}', Math.abs(jobReward)))
                 .addFields({
                     name: 'Balance Actual',
-                    value: `Tu nuevo balance es de **${moneyData[userId].balance}** monedas.`,
+                    value: `Tu nuevo balance es de **${newBalance}** monedas.`,
                 })
                 .setColor(jobReward >= 0 ? "Orange" : "Red")
                 .setTimestamp();
@@ -187,15 +180,10 @@ module.exports = {
             const user = interaction.options.getUser("usuario") || interaction.user;
             const targetId = user.id;
 
-            let balance = 0;
-            let usernameToDisplay = user.displayName;
+            let targetData = await collection.findOne({ userId: targetId });
 
-            if (moneyData[targetId]) {
-                balance = moneyData[targetId].balance;
-                if (moneyData[targetId].displayName) {
-                    usernameToDisplay = moneyData[target-d].displayName;
-                }
-            }
+            let balance = targetData ? targetData.balance : 0;
+            let usernameToDisplay = targetData ? targetData.displayName : user.displayName;
 
             const embed = new EmbedBuilder()
                 .setTitle("💰 Balance de Monedas")
@@ -216,38 +204,44 @@ module.exports = {
                 });
             }
 
-            if (moneyData[userId].balance < amount) {
+            if (userData.balance < amount) {
                 return await interaction.reply({
-                    content: `❌ No tienes suficientes monedas para transferir **${amount}**. Tu balance actual es de **${moneyData[userId].balance}** monedas.`,
+                    content: `❌ No tienes suficientes monedas para transferir **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
                     ephemeral: true
                 });
             }
-
-            if (!moneyData[recipientUser.id]) {
-                moneyData[recipientUser.id] = {
+            
+            let recipientData = await collection.findOne({ userId: recipientUser.id });
+            if (!recipientData) {
+                recipientData = {
+                    userId: recipientUser.id,
                     username: recipientUser.username,
                     displayName: recipientUser.displayName,
                     balance: 0,
                     last_daily: null,
                     last_job: null
                 };
+                await collection.insertOne(recipientData);
             }
 
-            moneyData[userId].balance -= amount;
-            moneyData[recipientUser.id].balance += amount;
-            await writeMoneyFile(moneyData);
+            const newSenderBalance = userData.balance - amount;
+            const newRecipientBalance = recipientData.balance + amount;
+            
+            await collection.updateOne({ userId }, { $set: { balance: newSenderBalance } });
+            await collection.updateOne({ userId: recipientUser.id }, { $set: { balance: newRecipientBalance } });
 
             const embed = new EmbedBuilder()
                 .setTitle("💸 Transferencia Exitosa")
                 .setDescription(`Has transferido **${amount}** monedas a **${recipientUser.displayName}**.`)
                 .addFields(
-                    { name: 'Tu nuevo balance', value: `**${moneyData[userId].balance}** monedas.`, inline: true },
-                    { name: 'Balance del receptor', value: `**${moneyData[recipientUser.id].balance}** monedas.`, inline: true }
+                    { name: 'Tu nuevo balance', value: `**${newSenderBalance}** monedas.`, inline: true },
+                    { name: 'Balance del receptor', value: `**${newRecipientBalance}** monedas.`, inline: true }
                 )
                 .setColor("Blue")
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
+
         } else if (subcommandGroup === 'manage') {
             if (!allowedUsers.includes(userId)) {
                 return await interaction.reply({
@@ -257,10 +251,11 @@ module.exports = {
             }
 
             if (subcommand === 'view') {
-                const fileContent = JSON.stringify(moneyData, null, 2);
+                const allUsers = await collection.find({}).toArray();
+                const fileContent = JSON.stringify(allUsers, null, 2);
                 
                 const embed = new EmbedBuilder()
-                    .setTitle("📁 Contenido de `money.json`")
+                    .setTitle("📁 Contenido de la Base de Datos")
                     .setDescription(`\`\`\`json\n${fileContent}\n\`\`\``)
                     .setColor("Blurple")
                     .setTimestamp();
@@ -271,21 +266,17 @@ module.exports = {
                 const userToEdit = interaction.options.getUser("usuario");
                 const newAmount = interaction.options.getInteger("cantidad");
 
-                if (!moneyData[userToEdit.id]) {
-                    moneyData[userToEdit.id] = { 
-                        username: userToEdit.username,
-                        displayName: userToEdit.displayName,
-                        balance: 0, 
-                        last_daily: null, 
-                        last_job: null 
-                    };
-                }
-
-                moneyData[userToEdit.id].balance = newAmount;
-                moneyData[userToEdit.id].username = userToEdit.username;
-                moneyData[userToEdit.id].displayName = userToEdit.displayName;
-                
-                await writeMoneyFile(moneyData);
+                await collection.updateOne(
+                    { userId: userToEdit.id },
+                    { 
+                        $set: { 
+                            balance: newAmount,
+                            username: userToEdit.username,
+                            displayName: userToEdit.displayName
+                        }
+                    },
+                    { upsert: true } // upsert: true creará el documento si no existe
+                );
 
                 const embed = new EmbedBuilder()
                     .setTitle("✏️ Balance Editado")
