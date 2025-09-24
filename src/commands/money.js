@@ -91,7 +91,7 @@ module.exports = {
     async execute(interaction) {
         await client.connect();
         const db = client.db("discord_bot"); // Puedes nombrar tu base de datos como quieras
-        const collection = db.collection("users"); // Colección para guardar los datos de los usuarios
+        const collection = db.collection("money"); // Colección para guardar los datos de los usuarios
 
         const subcommandGroup = interaction.options.getSubcommandGroup();
         const subcommand = interaction.options.getSubcommand();
