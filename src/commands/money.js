@@ -275,12 +275,12 @@ module.exports = {
             const number = interaction.options.getInteger("numero");
             const amount = interaction.options.getInteger("cantidad");
 
-            // if (userId === recipientUser.id) {
-            //     return await interaction.reply({
-            //         content: "❌ No puedes apostar contra ti mismo.",
-            //         ephemeral: true
-            //     });
-            // }
+            if (userId === recipientUser.id) {
+                return await interaction.reply({
+                    content: "❌ No puedes apostar contra ti mismo.",
+                    ephemeral: true
+                });
+            }
 
             if (userData.balance < amount) {
                 return await interaction.reply({
@@ -421,6 +421,7 @@ module.exports = {
         const number = parseInt(numberStr);
 
         // 2. Verificar si el usuario que hizo clic es el oponente.
+        console.log(interaction.user.id, opponentId);
         if (interaction.user.id !== opponentId) {
             await interaction.editReply({
                 content: "❌ Esta apuesta no es para ti."
