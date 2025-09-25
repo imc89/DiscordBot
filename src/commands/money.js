@@ -290,19 +290,13 @@ module.exports = {
             }
 
             let recipientData = await collection.findOne({ userId: recipientUser.id });
-            if (!recipientData) {
-                recipientData = {
-                    userId: recipientUser.id,
-                    username: recipientUser.username,
-                    displayName: recipientUser.displayName,
-                    balance: 0,
-                    last_daily: null,
-                    last_job: null
-                };
-                await collection.insertOne(recipientData);
+            if (!recipientData || recipientData.balance < amount) {
+                return await interaction.reply({
+                    content: `❌ El usuario **${recipientUser.displayName}** no tiene suficientes monedas para aceptar la apuesta de **${amount}**.`,
+                    ephemeral: true
+                });
             }
-            
-            // Los botones ahora son para que el contrincante elija PAR o IMPAR
+
             const row = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
@@ -349,7 +343,7 @@ module.exports = {
                 else if (rankNumber === 3) emoji = '🥉';
                 else emoji = `${rankNumber}.`;
 
-                const username = member ? member.displayName : user.username;
+                const username = member ? member.displayName : user.displayName;
                 description += `${emoji} **${username}**: ${user.balance} monedas\n`;
             }
 
@@ -411,7 +405,7 @@ module.exports = {
     async handleButtonInteraction(interaction) {
         // Asegúrate de que la interacción es de un botón y del juego de apuestas
         if (!interaction.isButton() || !interaction.customId.startsWith('game_')) return;
-        
+
         // 1. Difiera la respuesta inmediatamente para evitar el error de "Interacción fallida".
         await interaction.deferReply({ ephemeral: true });
 
@@ -421,12 +415,12 @@ module.exports = {
         const number = parseInt(numberStr);
 
         // 2. Verificar si el usuario que hizo clic es el oponente.
-        console.log(interaction.user.id, opponentId);
+        console.log('ID del que pulsó:', interaction.user.id);
+        console.log('ID del oponente esperado:', opponentId);
         if (interaction.user.id !== opponentId) {
-            await interaction.editReply({
+            return await interaction.editReply({
                 content: "❌ Esta apuesta no es para ti."
             });
-            return;
         }
 
         await client.connect();
@@ -436,7 +430,7 @@ module.exports = {
         const challengerData = await collection.findOne({ userId: challengerId });
         const opponentData = await collection.findOne({ userId: opponentId });
 
-        // 3. Verificar si ambos jugadores tienen suficientes fondos.
+        // 3. Verificar si ambos jugadores tienen suficientes fondos ANTES de procesar.
         if (!challengerData || challengerData.balance < amount || !opponentData || opponentData.balance < amount) {
             await interaction.message.edit({ components: [] }); // Desactivar botones
             return await interaction.editReply({
