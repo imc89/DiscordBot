@@ -451,7 +451,7 @@ module.exports = {
             if (reel[0] === reel[1] && reel[1] === reel[2]) {
                 if (reel[0] === '💎') {
                     winAmount = amount * 10;
-                    resultMessage = `🎉 ¡JACKPOT! Has sacado ${reelString} y has ganado **${winAmount}** monedas.`;
+                    resultMessage = `🎉 ¡JACKPOT! Has ganado **${winAmount}** monedas.`;
                     color = "Gold";
                 } else {
                     winAmount = amount * 4;
@@ -464,7 +464,7 @@ module.exports = {
                 color = "Blue";
             } else {
                 winAmount = -amount;
-                resultMessage = `😔 Has sacado ${reelString}. Has perdido **${amount}** monedas.`;
+                resultMessage = `😔 Has perdido **${amount}** monedas.`;
             }
 
             const newBalance = userData.balance + winAmount;
@@ -476,15 +476,14 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setTitle("🎰 Tragamonedas")
                 .setDescription(resultMessage)
-                .addFields({
-                    name: 'Balance Actual',
-                    value: `Tu nuevo balance es de **${newBalance}** monedas.`,
-                })
+                .addFields(
+                    { name: 'Resultado del carrete', value: `\`${reelString}\`` },
+                    { name: 'Balance Actual', value: `Tu nuevo balance es de **${newBalance}** monedas.` }
+                )
                 .setColor(color)
                 .setTimestamp();
 
             await interaction.editReply({ embeds: [embed] });
-
         } else if (subcommand === 'rob') {
             const targetUser = interaction.options.getUser("usuario");
             const targetId = targetUser.id;
