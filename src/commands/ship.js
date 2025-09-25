@@ -37,27 +37,27 @@ module.exports = {
         if (lovePercentage <= 10) {
             shipMessage = "Es un amor no correspondido, creo que ni se conocen.";
             shipEmoji = "💔";
-            color = "Red";
+            color = "LuminousVividPink";
         } else if (lovePercentage <= 30) {
             shipMessage = "Puede haber algo, pero hay muchos obstáculos.";
             shipEmoji = "🥀";
-            color = "DarkRed";
+            color = "Purple";
         } else if (lovePercentage <= 50) {
             shipMessage = "Hay una buena amistad, pero no hay nada más.";
             shipEmoji = "💞";
-            color = "Orange";
+            color = "Gold";
         } else if (lovePercentage <= 70) {
             shipMessage = "La química está ahí. ¡El futuro es prometedor!";
             shipEmoji = "💖";
-            color = "Gold";
+            color = "Orange";
         } else if (lovePercentage <= 90) {
             shipMessage = "¡Un match hecho en el cielo! Se ve mucho amor por aquí.";
             shipEmoji = "💕";
-            color = "Purple";
+            color = "DarkRed";
         } else {
             shipMessage = "¡Son almas gemelas! Una conexión casi perfecta.";
             shipEmoji = "❤️‍🔥";
-            color = "LuminousVividPink";
+            color = "Red";
         }
 
         // --- Generación de la imagen con Canvas ---
@@ -72,7 +72,7 @@ module.exports = {
         ctx.drawImage(avatar2, 280, 20, 100, 100);
 
         // Dibuja el corazón
-        ctx.fillStyle = color;
+        ctx.fillStyle = "Red";
         ctx.font = '50px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
