@@ -115,6 +115,9 @@ module.exports = {
         ),
 
     async execute(interaction) {
+        // Deferir la respuesta para evitar el timeout de 3 segundos, lo cual es vital.
+        await interaction.deferReply({ ephemeral: false });
+
         await client.connect();
         const db = client.db("discord_bot");
         const collection = db.collection("money");
@@ -125,6 +128,7 @@ module.exports = {
 
         let userData = await collection.findOne({ userId });
 
+        // Si el usuario no existe, se crea un nuevo documento
         if (!userData) {
             userData = {
                 userId,
@@ -147,7 +151,7 @@ module.exports = {
                 const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
                 const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
-                return await interaction.reply({
+                return await interaction.editReply({
                     content: `⏰ Ya has reclamado tu recompensa diaria. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
                     ephemeral: true
                 });
@@ -166,7 +170,7 @@ module.exports = {
                 .setColor("Gold")
                 .setTimestamp();
 
-            await interaction.reply({ embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
 
         } else if (subcommand === 'job') {
             const lastJob = userData.last_job;
@@ -178,7 +182,7 @@ module.exports = {
                 const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
                 const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
-                return await interaction.reply({
+                return await interaction.editReply({
                     content: `⏰ Ya has completado un trabajo recientemente. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
                     ephemeral: true
                 });
@@ -202,7 +206,7 @@ module.exports = {
                 .setColor(jobReward >= 0 ? "Orange" : "Red")
                 .setTimestamp();
 
-            await interaction.reply({ embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
 
         } else if (subcommand === 'balance') {
             const user = interaction.options.getUser("usuario") || interaction.user;
@@ -219,21 +223,21 @@ module.exports = {
                 .setColor("Green")
                 .setTimestamp();
 
-            await interaction.reply({ embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
 
         } else if (subcommand === 'transfer') {
             const recipientUser = interaction.options.getUser("usuario");
             const amount = interaction.options.getInteger("cantidad");
 
             if (userId === recipientUser.id) {
-                return await interaction.reply({
+                return await interaction.editReply({
                     content: "❌ No puedes transferir dinero a ti mismo.",
                     ephemeral: true
                 });
             }
 
             if (userData.balance < amount) {
-                return await interaction.reply({
+                return await interaction.editReply({
                     content: `❌ No tienes suficientes monedas para transferir **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
                     ephemeral: true
                 });
@@ -268,7 +272,7 @@ module.exports = {
                 .setColor("Blue")
                 .setTimestamp();
 
-            await interaction.reply({ embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
 
         } else if (subcommand === 'game') {
             const recipientUser = interaction.options.getUser("usuario");
@@ -276,14 +280,14 @@ module.exports = {
             const amount = interaction.options.getInteger("cantidad");
 
             if (userId === recipientUser.id) {
-                return await interaction.reply({
+                return await interaction.editReply({
                     content: "❌ No puedes apostar contra ti mismo.",
                     ephemeral: true
                 });
             }
 
             if (userData.balance < amount) {
-                return await interaction.reply({
+                return await interaction.editReply({
                     content: `❌ No tienes suficientes monedas para apostar **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
                     ephemeral: true
                 });
@@ -291,7 +295,7 @@ module.exports = {
 
             let recipientData = await collection.findOne({ userId: recipientUser.id });
             if (!recipientData || recipientData.balance < amount) {
-                return await interaction.reply({
+                return await interaction.editReply({
                     content: `❌ El usuario **${recipientUser.displayName}** no tiene suficientes monedas para aceptar la apuesta de **${amount}**.`,
                     ephemeral: true
                 });
@@ -323,7 +327,7 @@ module.exports = {
                 .setColor("Purple")
                 .setTimestamp();
 
-            await interaction.reply({
+            await interaction.editReply({
                 embeds: [embed],
                 components: [row]
             });
@@ -353,11 +357,11 @@ module.exports = {
                 .setColor("Green")
                 .setTimestamp();
 
-            await interaction.reply({ embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
 
         } else if (subcommandGroup === 'manage') {
             if (!allowedUsers.includes(userId)) {
-                return await interaction.reply({
+                return await interaction.editReply({
                     content: "❌ No tienes permiso para usar este comando de gestión.",
                     ephemeral: true
                 });
@@ -373,7 +377,7 @@ module.exports = {
                     .setColor("Blurple")
                     .setTimestamp();
 
-                await interaction.reply({ embeds: [embed] });
+                await interaction.editReply({ embeds: [embed] });
 
             } else if (subcommand === 'edit') {
                 const userToEdit = interaction.options.getUser("usuario");
@@ -397,7 +401,7 @@ module.exports = {
                     .setColor("DarkBlue")
                     .setTimestamp();
 
-                await interaction.reply({ embeds: [embed] });
+                await interaction.editReply({ embeds: [embed] });
             }
         }
     },
@@ -406,7 +410,7 @@ module.exports = {
         // Asegúrate de que la interacción es de un botón y del juego de apuestas
         if (!interaction.isButton() || !interaction.customId.startsWith('game_')) return;
 
-        // 1. Difiera la respuesta inmediatamente para evitar el error de "Interacción fallida".
+        // 1. Acknowledge the interaction immediately to prevent timeout errors.
         await interaction.deferReply({ ephemeral: true });
 
         // Descomponer los argumentos del customId
@@ -414,11 +418,10 @@ module.exports = {
         const amount = parseInt(amountStr);
         const number = parseInt(numberStr);
 
-        // 2. Verificar si el usuario que hizo clic es el oponente.
         console.log('ID del que pulsó:', interaction.user.id);
-        console.log('ID del oponente esperado yo?:', opponentId);
-        console.log('ID del oponente esperado:', challengerId);
-
+        console.log('ID del oponente esperado:', opponentId);
+        console.log('ID del retador esperado:', challengerId);
+        // 2. Verificar si el usuario que hizo clic es el oponente.
         if (interaction.user.id !== opponentId) {
             return await interaction.editReply({
                 content: "❌ Esta apuesta no es para ti."
