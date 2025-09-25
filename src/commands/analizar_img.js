@@ -49,7 +49,7 @@ module.exports = {
             const promptVision = [
                 imagePart,
                 {
-                    text: `Analiza esta imagen de perfil y describe lo que ves, su estilo, y cualquier detalle interesante. ¿Qué ambiente o impresión transmite? Responde de manera concisa y en español. Incluye un pequeño saludo.`
+                    text: `IMPORTANTE EN MENOS DE 1000 CARACTERES, Analiza esta imagen de perfil y describe lo que ves, su estilo, y cualquier detalle interesante. ¿Qué ambiente o impresión transmite? Responde de manera concisa y en español. Incluye un pequeño saludo.`
                 }
             ];
 
