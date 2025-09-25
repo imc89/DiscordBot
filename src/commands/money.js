@@ -1,12 +1,10 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { MongoClient } = require("mongodb");
 
 // Define los IDs de los usuarios que pueden usar el comando de gestión
 const allowedUsers = ['852486349520371744', '1056942076480204801'];
 
 // Configura tu cadena de conexión a MongoDB
-
-
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_USER}.patcutg.mongodb.net/?retryWrites=true&w=majority&appName=${process.env.DB_USER}`;
 const client = new MongoClient(uri);
 
@@ -62,6 +60,22 @@ module.exports = {
                         .setMinValue(1)
                 )
         )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('game')
+                .setDescription('Apuesta a PAR o IMPAR contra otro usuario.')
+                .addUserOption(option =>
+                    option.setName('usuario')
+                        .setDescription('El usuario al que quieres desafiar.')
+                        .setRequired(true)
+                )
+                .addIntegerOption(option =>
+                    option.setName('cantidad')
+                        .setDescription('La cantidad de monedas a apostar.')
+                        .setRequired(true)
+                        .setMinValue(1)
+                )
+        )
         .addSubcommandGroup(group =>
             group
                 .setName('manage')
@@ -90,13 +104,13 @@ module.exports = {
 
     async execute(interaction) {
         await client.connect();
-        const db = client.db("discord_bot"); // Puedes nombrar tu base de datos como quieras
-        const collection = db.collection("money"); // Colección para guardar los datos de los usuarios
+        const db = client.db("discord_bot");
+        const collection = db.collection("money");
 
         const subcommandGroup = interaction.options.getSubcommandGroup();
         const subcommand = interaction.options.getSubcommand();
         const userId = interaction.user.id;
-        
+
         let userData = await collection.findOne({ userId });
 
         if (!userData) {
@@ -120,7 +134,7 @@ module.exports = {
                 const timeLeft = oneDayInMs - (now.getTime() - new Date(lastDaily).getTime());
                 const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
                 const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                
+
                 return await interaction.reply({
                     content: `⏰ Ya has reclamado tu recompensa diaria. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
                     ephemeral: true
@@ -130,7 +144,7 @@ module.exports = {
             const dailyReward = 200;
             const newBalance = userData.balance + dailyReward;
             await collection.updateOne(
-                { userId }, 
+                { userId },
                 { $set: { balance: newBalance, last_daily: now.toISOString() } }
             );
 
@@ -141,7 +155,7 @@ module.exports = {
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
-            
+
         } else if (subcommand === 'job') {
             const lastJob = userData.last_job;
             const now = new Date();
@@ -151,7 +165,7 @@ module.exports = {
                 const timeLeft = jobCooldownInMs - (now.getTime() - new Date(lastJob).getTime());
                 const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
                 const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                
+
                 return await interaction.reply({
                     content: `⏰ Ya has completado un trabajo recientemente. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
                     ephemeral: true
@@ -162,7 +176,7 @@ module.exports = {
             const jobReward = randomReward.amount;
             const newBalance = userData.balance + jobReward;
             await collection.updateOne(
-                { userId }, 
+                { userId },
                 { $set: { balance: newBalance, last_job: now.toISOString() } }
             );
 
@@ -177,7 +191,7 @@ module.exports = {
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
-            
+
         } else if (subcommand === 'balance') {
             const user = interaction.options.getUser("usuario") || interaction.user;
             const targetId = user.id;
@@ -212,7 +226,7 @@ module.exports = {
                     ephemeral: true
                 });
             }
-            
+
             let recipientData = await collection.findOne({ userId: recipientUser.id });
             if (!recipientData) {
                 recipientData = {
@@ -228,7 +242,7 @@ module.exports = {
 
             const newSenderBalance = userData.balance - amount;
             const newRecipientBalance = recipientData.balance + amount;
-            
+
             await collection.updateOne({ userId }, { $set: { balance: newSenderBalance } });
             await collection.updateOne({ userId: recipientUser.id }, { $set: { balance: newRecipientBalance } });
 
@@ -244,6 +258,67 @@ module.exports = {
 
             await interaction.reply({ embeds: [embed] });
 
+        } else if (subcommand === 'game') {
+            const recipientUser = interaction.options.getUser("usuario");
+            const amount = interaction.options.getInteger("cantidad");
+
+            if (userId === recipientUser.id) {
+                return await interaction.reply({
+                    content: "❌ No puedes apostar contra ti mismo.",
+                    ephemeral: true
+                });
+            }
+
+            if (userData.balance < amount) {
+                return await interaction.reply({
+                    content: `❌ No tienes suficientes monedas para apostar **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
+                    ephemeral: true
+                });
+            }
+
+            let recipientData = await collection.findOne({ userId: recipientUser.id });
+            if (!recipientData) {
+                recipientData = {
+                    userId: recipientUser.id,
+                    username: recipientUser.username,
+                    displayName: recipientUser.displayName,
+                    balance: 0,
+                    last_daily: null,
+                    last_job: null
+                };
+                await collection.insertOne(recipientData);
+            }
+
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`game_accept_${userId}_${recipientUser.id}_${amount}_even`)
+                        .setLabel('Aceptar y Apostar a PAR')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId(`game_accept_${userId}_${recipientUser.id}_${amount}_odd`)
+                        .setLabel('Aceptar y Apostar a IMPAR')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId(`game_decline_${userId}_${recipientUser.id}`)
+                        .setLabel('Rechazar Apuesta')
+                        .setStyle(ButtonStyle.Danger),
+                );
+
+            const embed = new EmbedBuilder()
+                .setTitle("🎲 ¡Nueva Apuesta!")
+                .setDescription(`**${recipientUser.displayName}**, **${interaction.user.displayName}** te ha desafiado a una apuesta de **${amount}** monedas.`)
+                .addFields({
+                    name: 'Instrucciones',
+                    value: 'Haz clic en el botón de abajo para aceptar la apuesta y elegir si apuestas a PAR o a IMPAR.',
+                })
+                .setColor("Purple")
+                .setTimestamp();
+
+            await interaction.reply({
+                embeds: [embed],
+                components: [row]
+            });
         } else if (subcommandGroup === 'manage') {
             if (!allowedUsers.includes(userId)) {
                 return await interaction.reply({
@@ -255,13 +330,13 @@ module.exports = {
             if (subcommand === 'view') {
                 const allUsers = await collection.find({}).toArray();
                 const fileContent = JSON.stringify(allUsers, null, 2);
-                
+
                 const embed = new EmbedBuilder()
                     .setTitle("📁 Contenido de la Base de Datos")
                     .setDescription(`\`\`\`json\n${fileContent}\n\`\`\``)
                     .setColor("Blurple")
                     .setTimestamp();
-                
+
                 await interaction.reply({ embeds: [embed] });
 
             } else if (subcommand === 'edit') {
@@ -270,14 +345,14 @@ module.exports = {
 
                 await collection.updateOne(
                     { userId: userToEdit.id },
-                    { 
-                        $set: { 
+                    {
+                        $set: {
                             balance: newAmount,
                             username: userToEdit.username,
                             displayName: userToEdit.displayName
                         }
                     },
-                    { upsert: true } // upsert: true creará el documento si no existe
+                    { upsert: true }
                 );
 
                 const embed = new EmbedBuilder()
