@@ -83,6 +83,11 @@ module.exports = {
                         .setMinValue(1)
                 )
         )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('rank')
+                .setDescription('Muestra el ranking de los usuarios más ricos.')
+        )
         .addSubcommandGroup(group =>
             group
                 .setName('manage')
@@ -296,15 +301,17 @@ module.exports = {
                 };
                 await collection.insertOne(recipientData);
             }
-
-            const isEven = number % 2 === 0;
-            const creatorChoice = isEven ? 'par' : 'impar';
-
+            
+            // Los botones ahora son para que el contrincante elija PAR o IMPAR
             const row = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`game_accept_${userId}_${recipientUser.id}_${amount}_${creatorChoice}`)
-                        .setLabel('Aceptar Apuesta')
+                        .setCustomId(`game_par_${userId}_${recipientUser.id}_${amount}_${number}`)
+                        .setLabel('PAR')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId(`game_impar_${userId}_${recipientUser.id}_${amount}_${number}`)
+                        .setLabel('IMPAR')
                         .setStyle(ButtonStyle.Primary),
                     new ButtonBuilder()
                         .setCustomId(`game_decline_${userId}_${recipientUser.id}`)
@@ -314,10 +321,10 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setTitle("🎲 ¡Nueva Apuesta!")
-                .setDescription(`**${recipientUser.displayName}**, **${interaction.user.displayName}** te ha desafiado a una apuesta de **${amount}** monedas. El número a adivinar es **${number}**.`)
+                .setDescription(`**${recipientUser.displayName}**, **${interaction.user.displayName}** te ha desafiado a una apuesta de **${amount}** monedas. Adivina si el número que ha escogido es PAR o IMPAR.`)
                 .addFields({
                     name: 'Instrucciones',
-                    value: `El número elegido por ${interaction.user.displayName} es **${creatorChoice.toUpperCase()}**. Si aciertas, ganas.`,
+                    value: `Elige PAR si crees que el número es par, o IMPAR si crees que es impar.`,
                 })
                 .setColor("Purple")
                 .setTimestamp();
@@ -326,6 +333,34 @@ module.exports = {
                 embeds: [embed],
                 components: [row]
             });
+
+        } else if (subcommand === 'rank') {
+            const users = await collection.find({}).sort({ balance: -1 }).limit(10).toArray();
+
+            let description = '';
+            for (let i = 0; i < users.length; i++) {
+                const user = users[i];
+                const member = interaction.guild.members.cache.get(user.userId);
+                const rankNumber = i + 1;
+                let emoji = '';
+
+                if (rankNumber === 1) emoji = '🏅';
+                else if (rankNumber === 2) emoji = '🥈';
+                else if (rankNumber === 3) emoji = '🥉';
+                else emoji = `${rankNumber}.`;
+
+                const username = member ? member.displayName : user.username;
+                description += `${emoji} **${username}**: ${user.balance} monedas\n`;
+            }
+
+            const embed = new EmbedBuilder()
+                .setTitle("🏆 Ranking de Riqueza")
+                .setDescription(description || 'Aún no hay usuarios en el ranking.')
+                .setColor("Green")
+                .setTimestamp();
+
+            await interaction.reply({ embeds: [embed] });
+
         } else if (subcommandGroup === 'manage') {
             if (!allowedUsers.includes(userId)) {
                 return await interaction.reply({
