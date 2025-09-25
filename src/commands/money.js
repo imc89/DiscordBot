@@ -88,6 +88,27 @@ module.exports = {
                 .setName('rank')
                 .setDescription('Muestra el ranking de los usuarios más ricos.')
         )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('slot')
+                .setDescription('Juega a las tragamonedas para ganar o perder monedas.')
+                .addIntegerOption(option =>
+                    option.setName("cantidad")
+                        .setDescription("La cantidad de monedas a apostar.")
+                        .setRequired(true)
+                        .setMinValue(1)
+                )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('rob')
+                .setDescription('Intenta robarle a otro usuario.')
+                .addUserOption(option =>
+                    option.setName("usuario")
+                        .setDescription("El usuario al que quieres robar.")
+                        .setRequired(true)
+                )
+        )
         .addSubcommandGroup(group =>
             group
                 .setName('manage')
@@ -109,27 +130,6 @@ module.exports = {
                         .addIntegerOption(option =>
                             option.setName("cantidad")
                                 .setDescription("La nueva cantidad de monedas.")
-                                .setRequired(true)
-                        )
-                )
-                .addSubcommand(subcommand =>
-                    subcommand
-                        .setName('slot')
-                        .setDescription('Juega a las tragamonedas para ganar o perder monedas.')
-                        .addIntegerOption(option =>
-                            option.setName("cantidad")
-                                .setDescription("La cantidad de monedas a apostar.")
-                                .setRequired(true)
-                                .setMinValue(1)
-                        )
-                )
-                .addSubcommand(subcommand =>
-                    subcommand
-                        .setName('rob')
-                        .setDescription('Intenta robarle a otro usuario.')
-                        .addUserOption(option =>
-                            option.setName("usuario")
-                                .setDescription("El usuario al que quieres robar.")
                                 .setRequired(true)
                         )
                 )
