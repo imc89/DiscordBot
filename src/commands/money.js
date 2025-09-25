@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events } = require("discord.js");
 const { MongoClient } = require("mongodb");
 
 // Define los IDs de los usuarios que pueden usar el comando de gestión
@@ -301,7 +301,7 @@ module.exports = {
                 };
                 await collection.insertOne(recipientData);
             }
-            
+
             // Los botones ahora son para que el contrincante elija PAR o IMPAR
             const row = new ActionRowBuilder()
                 .addComponents(
@@ -407,4 +407,108 @@ module.exports = {
             }
         }
     },
+
+    // AÑADIDO: Nuevo método para manejar las interacciones de los botones
+    async handleButtonInteraction(interaction) {
+        // Asegúrate de que la interacción es de un botón
+        if (!interaction.isButton()) return;
+        
+        // Separa el customId para extraer la información
+        const [action, ...args] = interaction.customId.split('_');
+
+        // Solo procesa las interacciones de botones que comienzan con 'game_'
+        if (action !== 'game') return;
+
+        // Descomponer los argumentos
+        const [gameType, challengerId, opponentId, amountStr, numberStr] = interaction.customId.split('_');
+        const amount = parseInt(amountStr);
+        const number = parseInt(numberStr);
+
+        // Si el usuario que hizo clic no es el oponente, rechaza la interacción
+        if (interaction.user.id !== opponentId) {
+            return await interaction.reply({
+                content: "❌ Esta apuesta no es para ti.",
+                ephemeral: true
+            });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        // Conectar a la base de datos
+        await client.connect();
+        const db = client.db("discord_bot");
+        const collection = db.collection("money");
+
+        const challengerData = await collection.findOne({ userId: challengerId });
+        const opponentData = await collection.findOne({ userId: opponentId });
+
+        // Verificar si los balances son suficientes antes de procesar
+        if (challengerData.balance < amount || opponentData.balance < amount) {
+            await interaction.editReply({
+                content: "❌ Uno de los jugadores no tiene suficiente dinero para la apuesta.",
+                ephemeral: true
+            });
+            await interaction.message.edit({ components: [] }); // Desactivar botones
+            return;
+        }
+
+        // Lógica para el botón de rechazo
+        if (gameType === 'game' && action === 'decline') {
+            const declineEmbed = new EmbedBuilder()
+                .setTitle('❌ Apuesta Rechazada')
+                .setDescription(`**${interaction.user.displayName}** ha rechazado la apuesta de **${amount}** monedas.`)
+                .setColor('Red');
+
+            await interaction.message.edit({ embeds: [declineEmbed], components: [] });
+            await interaction.editReply({ content: '✅ Has rechazado la apuesta.' });
+            return;
+        }
+
+        const isEven = number % 2 === 0;
+        const opponentGuessEven = gameType.includes('par');
+
+        let resultMessage;
+        let winnerId;
+        let loserId;
+        let winnerUser;
+        let loserUser;
+
+        if ((isEven && opponentGuessEven) || (!isEven && !opponentGuessEven)) {
+            // El oponente adivinó correctamente
+            winnerId = opponentId;
+            loserId = challengerId;
+            winnerUser = interaction.user;
+            loserUser = interaction.guild.members.cache.get(challengerId).user;
+            resultMessage = `🎉 ¡Victoria! **${winnerUser.displayName}** ha adivinado correctamente. El número era **${number}** y es ${isEven ? 'PAR' : 'IMPAR'}.`;
+        } else {
+            // El oponente se equivocó
+            winnerId = challengerId;
+            loserId = opponentId;
+            winnerUser = interaction.guild.members.cache.get(challengerId).user;
+            loserUser = interaction.user;
+            resultMessage = `❌ ¡Derrota! **${loserUser.displayName}** se ha equivocado. El número era **${number}** y es ${isEven ? 'PAR' : 'IMPAR'}.`;
+        }
+
+        // Actualizar balances
+        await collection.updateOne({ userId: winnerId }, { $inc: { balance: amount } });
+        await collection.updateOne({ userId: loserId }, { $inc: { balance: -amount } });
+
+        // Recuperar balances actualizados
+        const newWinnerData = await collection.findOne({ userId: winnerId });
+        const newLoserData = await collection.findOne({ userId: loserId });
+
+        // Crear y enviar embed del resultado
+        const resultEmbed = new EmbedBuilder()
+            .setTitle('🎲 Resultado de la Apuesta')
+            .setDescription(resultMessage)
+            .addFields(
+                { name: `Balance de ${winnerUser.displayName}`, value: `**${newWinnerData.balance}** monedas`, inline: true },
+                { name: `Balance de ${loserUser.displayName}`, value: `**${newLoserData.balance}** monedas`, inline: true }
+            )
+            .setColor(isEven ? 'LuminousVividPink' : 'DarkVividPink')
+            .setTimestamp();
+
+        await interaction.message.edit({ embeds: [resultEmbed], components: [] });
+        await interaction.editReply({ content: '✅ La apuesta ha sido procesada.' });
+    }
 };
