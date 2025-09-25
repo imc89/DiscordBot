@@ -410,6 +410,7 @@ module.exports = {
         await interaction.deferReply({ ephemeral: true });
 
         // Descomponer los argumentos del customId
+        console.log("hola",interaction.customId.split('_'))
         const [action, challengerId, opponentId, amountStr, numberStr] = interaction.customId.split('_');
         const amount = parseInt(amountStr);
         const number = parseInt(numberStr);
