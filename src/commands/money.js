@@ -279,6 +279,7 @@ module.exports = {
             const number = interaction.options.getInteger("numero");
             const amount = interaction.options.getInteger("cantidad");
 
+
             if (userId === recipientUser.id) {
                 return await interaction.editReply({
                     content: "❌ No puedes apostar contra ti mismo.",
@@ -407,22 +408,36 @@ module.exports = {
     },
 
     async handleButtonInteraction(interaction) {
-        // Asegúrate de que la interacción es de un botón y del juego de apuestas
         if (!interaction.isButton() || !interaction.customId.startsWith('game_')) return;
 
-        // 1. Acknowledge the interaction immediately to prevent timeout errors.
         await interaction.deferReply({ ephemeral: true });
 
-        // Descomponer los argumentos del customId
-        const [action, challengerId, opponentId, amountStr, numberStr] = interaction.customId.split('_');
+        // Descomponer el customId.
+        // El orden es: [ prefijo, tipo de apuesta, ID del retador, ID del oponente, cantidad, numero ]
+        const parts = interaction.customId.split('_');
+
+        // Validar el formato del customId
+        if (parts.length !== 6) {
+            return await interaction.editReply({
+                content: "❌ Hubo un error procesando la apuesta. Por favor, inicia una nueva."
+            });
+        }
+
+        const [prefix, action, challengerId, opponentId, amountStr, numberStr] = parts;
         const amount = parseInt(amountStr);
         const number = parseInt(numberStr);
 
-        console.log('ID del que pulsó:', interaction.user.id);
-        console.log('ID del oponente esperado:', opponentId);
-        console.log('ID del retador esperado:', challengerId);
-        // 2. Verificar si el usuario que hizo clic es el oponente.
-        if (interaction.user.id !== opponentId) {
+        console.log("prefix:", prefix);
+        console.log("action:", action);
+        console.log("challengerId:", challengerId);
+        console.log("opponentId:", opponentId);
+        console.log("amount:", amount);
+        console.log("number:", number);
+        // Obtener el ID del usuario que hizo clic
+        const clickedUserId = interaction.user.id;
+
+        // Verificar si el usuario que hizo clic es el oponente.
+        if (clickedUserId !== opponentId) {
             return await interaction.editReply({
                 content: "❌ Esta apuesta no es para ti."
             });
@@ -435,15 +450,15 @@ module.exports = {
         const challengerData = await collection.findOne({ userId: challengerId });
         const opponentData = await collection.findOne({ userId: opponentId });
 
-        // 3. Verificar si ambos jugadores tienen suficientes fondos ANTES de procesar.
+        // Validar fondos y usuarios
         if (!challengerData || challengerData.balance < amount || !opponentData || opponentData.balance < amount) {
-            await interaction.message.edit({ components: [] }); // Desactivar botones
+            await interaction.message.edit({ components: [] });
             return await interaction.editReply({
                 content: "❌ Uno de los jugadores no tiene suficientes monedas para continuar con la apuesta."
             });
         }
 
-        // 4. Lógica para el botón de rechazo
+        // Lógica para el botón de rechazo
         if (action === 'decline') {
             const declineEmbed = new EmbedBuilder()
                 .setTitle('❌ Apuesta Rechazada')
@@ -454,7 +469,7 @@ module.exports = {
             return await interaction.editReply({ content: '✅ Has rechazado la apuesta.' });
         }
 
-        // 5. Lógica principal del juego (PAR o IMPAR)
+        // Lógica del juego
         const isEven = number % 2 === 0;
         const opponentGuessEven = action === 'par';
 
@@ -465,14 +480,12 @@ module.exports = {
         let loserUser;
 
         if ((isEven && opponentGuessEven) || (!isEven && !opponentGuessEven)) {
-            // El oponente adivinó correctamente
             winnerId = opponentId;
             loserId = challengerId;
             winnerUser = interaction.user;
             loserUser = await interaction.client.users.fetch(challengerId);
             resultMessage = `🎉 ¡Victoria! **${winnerUser.displayName}** ha adivinado correctamente. El número era **${number}** y es ${isEven ? 'PAR' : 'IMPAR'}.`;
         } else {
-            // El oponente se equivocó
             winnerId = challengerId;
             loserId = opponentId;
             winnerUser = await interaction.client.users.fetch(challengerId);
@@ -480,15 +493,15 @@ module.exports = {
             resultMessage = `❌ ¡Derrota! **${loserUser.displayName}** se ha equivocado. El número era **${number}** y es ${isEven ? 'PAR' : 'IMPAR'}.`;
         }
 
-        // 6. Actualizar balances en la base de datos
+        // Actualizar balances
         await collection.updateOne({ userId: winnerId }, { $inc: { balance: amount } });
         await collection.updateOne({ userId: loserId }, { $inc: { balance: -amount } });
 
-        // 7. Recuperar balances actualizados para mostrar el resultado
+        // Recuperar balances actualizados
         const newWinnerData = await collection.findOne({ userId: winnerId });
         const newLoserData = await collection.findOne({ userId: loserId });
 
-        // 8. Crear y enviar embed del resultado
+        // Crear y enviar embed del resultado
         const resultEmbed = new EmbedBuilder()
             .setTitle('🎲 Resultado de la Apuesta')
             .setDescription(resultMessage)
