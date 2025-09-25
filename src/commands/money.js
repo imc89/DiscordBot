@@ -504,7 +504,7 @@ module.exports = {
                 });
             }
 
-            const robSuccess = Math.random() < 0.3; // 30% de probabilidad de éxito
+            const robSuccess = Math.random() < 0.4; // 40% de probabilidad de éxito
             let robAmount;
             let newRobberBalance;
             let newTargetBalance;
