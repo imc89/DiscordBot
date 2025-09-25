@@ -3,7 +3,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Inicializa la IA
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -16,6 +16,7 @@ module.exports = {
         ),
     
     async execute(interaction) {
+        // Responde inmediatamente para evitar el timeout
         await interaction.deferReply();
         
         const name = interaction.options.getString("nombre");
@@ -47,10 +48,12 @@ module.exports = {
                 .setFooter({ text: "Esta cita ha sido generada por Gemini." })
                 .setTimestamp();
             
+            // Edita la respuesta una vez que la información está lista
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
             console.error("⚠️ Error al generar la cita con Gemini:", error);
+            // Edita la respuesta para informar del error
             await interaction.editReply("⚠️ Ocurrió un error al intentar generar la cita. Revisa el log para más detalles.");
         }
     },
