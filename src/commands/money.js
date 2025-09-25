@@ -62,7 +62,7 @@ module.exports = {
         )
         .addSubcommand(subcommand =>
             subcommand
-                .setName('game')
+                .setName('bet')
                 .setDescription('Apuesta a PAR o IMPAR contra otro usuario.')
                 .addUserOption(option =>
                     option.setName('usuario')
@@ -74,6 +74,15 @@ module.exports = {
                         .setDescription('La cantidad de monedas a apostar.')
                         .setRequired(true)
                         .setMinValue(1)
+                )
+                .addStringOption(option =>
+                    option.setName('eleccion')
+                        .setDescription('Tu elección: "par" o "impar".')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: 'PAR', value: 'par' },
+                            { name: 'IMPAR', value: 'impar' }
+                        )
                 )
         )
         .addSubcommandGroup(group =>
@@ -258,9 +267,10 @@ module.exports = {
 
             await interaction.reply({ embeds: [embed] });
 
-        } else if (subcommand === 'game') {
+        } else if (subcommand === 'bet') {
             const recipientUser = interaction.options.getUser("usuario");
             const amount = interaction.options.getInteger("cantidad");
+            const choice = interaction.options.getString("eleccion");
 
             if (userId === recipientUser.id) {
                 return await interaction.reply({
@@ -292,25 +302,21 @@ module.exports = {
             const row = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`game_accept_${userId}_${recipientUser.id}_${amount}_even`)
-                        .setLabel('Aceptar y Apostar a PAR')
+                        .setCustomId(`bet_accept_${userId}_${recipientUser.id}_${amount}_${choice}`)
+                        .setLabel('Aceptar Apuesta')
                         .setStyle(ButtonStyle.Primary),
                     new ButtonBuilder()
-                        .setCustomId(`game_accept_${userId}_${recipientUser.id}_${amount}_odd`)
-                        .setLabel('Aceptar y Apostar a IMPAR')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId(`game_decline_${userId}_${recipientUser.id}`)
+                        .setCustomId(`bet_decline_${userId}_${recipientUser.id}`)
                         .setLabel('Rechazar Apuesta')
                         .setStyle(ButtonStyle.Danger),
                 );
 
             const embed = new EmbedBuilder()
                 .setTitle("🎲 ¡Nueva Apuesta!")
-                .setDescription(`**${recipientUser.displayName}**, **${interaction.user.displayName}** te ha desafiado a una apuesta de **${amount}** monedas.`)
+                .setDescription(`**${recipientUser.displayName}**, **${interaction.user.displayName}** te ha desafiado a una apuesta de **${amount}** monedas. Debes acertar si el número es **${choice.toUpperCase()}** o no.`)
                 .addFields({
                     name: 'Instrucciones',
-                    value: 'Haz clic en el botón de abajo para aceptar la apuesta y elegir si apuestas a PAR o a IMPAR.',
+                    value: 'Haz clic en el botón para aceptar la apuesta.',
                 })
                 .setColor("Purple")
                 .setTimestamp();
