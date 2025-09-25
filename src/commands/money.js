@@ -275,12 +275,12 @@ module.exports = {
             const number = interaction.options.getInteger("numero");
             const amount = interaction.options.getInteger("cantidad");
 
-            if (userId === recipientUser.id) {
-                return await interaction.reply({
-                    content: "❌ No puedes apostar contra ti mismo.",
-                    ephemeral: true
-                });
-            }
+            // if (userId === recipientUser.id) {
+            //     return await interaction.reply({
+            //         content: "❌ No puedes apostar contra ti mismo.",
+            //         ephemeral: true
+            //     });
+            // }
 
             if (userData.balance < amount) {
                 return await interaction.reply({
