@@ -112,7 +112,29 @@ module.exports = {
                                 .setRequired(true)
                         )
                 )
+                .addSubcommand(subcommand =>
+                    subcommand
+                        .setName('slot')
+                        .setDescription('Juega a las tragamonedas para ganar o perder monedas.')
+                        .addIntegerOption(option =>
+                            option.setName("cantidad")
+                                .setDescription("La cantidad de monedas a apostar.")
+                                .setRequired(true)
+                                .setMinValue(1)
+                        )
+                )
+                .addSubcommand(subcommand =>
+                    subcommand
+                        .setName('rob')
+                        .setDescription('Intenta robarle a otro usuario.')
+                        .addUserOption(option =>
+                            option.setName("usuario")
+                                .setDescription("El usuario al que quieres robar.")
+                                .setRequired(true)
+                        )
+                )
         ),
+
 
     async execute(interaction) {
         // Deferir la respuesta para evitar el timeout de 3 segundos, lo cual es vital.
@@ -404,6 +426,128 @@ module.exports = {
 
                 await interaction.editReply({ embeds: [embed] });
             }
+        } else if (subcommand === 'slot') {
+            const amount = interaction.options.getInteger("cantidad");
+
+            if (userData.balance < amount) {
+                return await interaction.editReply({
+                    content: `❌ No tienes suficientes monedas para apostar **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
+                    ephemeral: true
+                });
+            }
+
+            const emojis = ['🍒', '🍋', '🔔', '💎', '🍀'];
+            const reel = [
+                emojis[Math.floor(Math.random() * emojis.length)],
+                emojis[Math.floor(Math.random() * emojis.length)],
+                emojis[Math.floor(Math.random() * emojis.length)]
+            ];
+            const reelString = reel.join(' | ');
+
+            let resultMessage;
+            let winAmount = 0;
+            let color = "Red";
+
+            if (reel[0] === reel[1] && reel[1] === reel[2]) {
+                if (reel[0] === '💎') {
+                    winAmount = amount * 10;
+                    resultMessage = `🎉 ¡JACKPOT! Has sacado ${reelString} y has ganado **${winAmount}** monedas.`;
+                    color = "Gold";
+                } else {
+                    winAmount = amount * 4;
+                    resultMessage = `🎉 ¡Has sacado triple! Has ganado **${winAmount}** monedas.`;
+                    color = "Green";
+                }
+            } else if (reel[0] === reel[1] || reel[1] === reel[2] || reel[0] === reel[2]) {
+                winAmount = amount * 2;
+                resultMessage = `🥳 ¡Has sacado doble! Has ganado **${winAmount}** monedas.`;
+                color = "Blue";
+            } else {
+                winAmount = -amount;
+                resultMessage = `😔 Has sacado ${reelString}. Has perdido **${amount}** monedas.`;
+            }
+
+            const newBalance = userData.balance + winAmount;
+            await collection.updateOne(
+                { userId },
+                { $set: { balance: newBalance } }
+            );
+
+            const embed = new EmbedBuilder()
+                .setTitle("🎰 Tragamonedas")
+                .setDescription(resultMessage)
+                .addFields({
+                    name: 'Balance Actual',
+                    value: `Tu nuevo balance es de **${newBalance}** monedas.`,
+                })
+                .setColor(color)
+                .setTimestamp();
+
+            await interaction.editReply({ embeds: [embed] });
+
+        } else if (subcommand === 'rob') {
+            const targetUser = interaction.options.getUser("usuario");
+            const targetId = targetUser.id;
+
+            if (userId === targetId) {
+                return await interaction.editReply({
+                    content: "❌ No puedes robarte a ti mismo.",
+                    ephemeral: true
+                });
+            }
+
+            let targetData = await collection.findOne({ userId: targetId });
+
+            if (!targetData || targetData.balance < 100) {
+                return await interaction.editReply({
+                    content: `❌ El usuario **${targetUser.displayName}** no tiene suficientes monedas para ser robado (necesita al menos 100 monedas).`,
+                    ephemeral: true
+                });
+            }
+
+            const robSuccess = Math.random() < 0.3; // 30% de probabilidad de éxito
+            let robAmount;
+            let newRobberBalance;
+            let newTargetBalance;
+            let embed;
+
+            if (robSuccess) {
+                robAmount = Math.floor(Math.random() * (targetData.balance * 0.2 - targetData.balance * 0.1 + 1)) + (targetData.balance * 0.1);
+                robAmount = Math.floor(robAmount); // Asegura que sea un entero
+
+                newRobberBalance = userData.balance + robAmount;
+                newTargetBalance = targetData.balance - robAmount;
+
+                await collection.updateOne({ userId }, { $set: { balance: newRobberBalance } });
+                await collection.updateOne({ userId: targetId }, { $set: { balance: newTargetBalance } });
+
+                embed = new EmbedBuilder()
+                    .setTitle("🔪 Robo Exitoso")
+                    .setDescription(`¡Has logrado robarle **${robAmount}** monedas a **${targetUser.displayName}**!`)
+                    .addFields(
+                        { name: `Tu nuevo balance`, value: `**${newRobberBalance}** monedas`, inline: true },
+                        { name: `Balance de ${targetUser.displayName}`, value: `**${newTargetBalance}** monedas`, inline: true }
+                    )
+                    .setColor("Green")
+                    .setTimestamp();
+            } else {
+                const penaltyAmount = Math.floor(Math.random() * (100 - 50 + 1)) + 50;
+                newRobberBalance = userData.balance - penaltyAmount;
+
+                await collection.updateOne({ userId }, { $set: { balance: newRobberBalance } });
+
+                embed = new EmbedBuilder()
+                    .setTitle("🚔 Robo Fallido")
+                    .setDescription(`¡Fuiste atrapado intentando robarle a **${targetUser.displayName}** y tuviste que pagar una multa de **${penaltyAmount}** monedas!`)
+                    .addFields({
+                        name: `Tu nuevo balance`,
+                        value: `**${newRobberBalance}** monedas`,
+                    })
+                    .setColor("Red")
+                    .setTimestamp();
+            }
+
+            await interaction.editReply({ embeds: [embed] });
         }
     },
 
@@ -427,15 +571,8 @@ module.exports = {
         const amount = parseInt(amountStr);
         const number = parseInt(numberStr);
 
-        console.log("prefix:", prefix);
-        console.log("action:", action);
-        console.log("challengerId:", challengerId);
-        console.log("opponentId:", opponentId);
-        console.log("amount:", amount);
-        console.log("number:", number);
         // Obtener el ID del usuario que hizo clic
         const clickedUserId = interaction.user.id;
-        console.log("clicker:", number); 
         // Verificar si el usuario que hizo clic es el oponente.
         if (clickedUserId !== opponentId) {
             return await interaction.editReply({
