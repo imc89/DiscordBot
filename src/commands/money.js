@@ -62,27 +62,25 @@ module.exports = {
         )
         .addSubcommand(subcommand =>
             subcommand
-                .setName('bet')
-                .setDescription('Apuesta a PAR o IMPAR contra otro usuario.')
+                .setName('game')
+                .setDescription('Desafía a un usuario a un juego de adivinar PAR o IMPAR.')
                 .addUserOption(option =>
                     option.setName('usuario')
                         .setDescription('El usuario al que quieres desafiar.')
                         .setRequired(true)
                 )
                 .addIntegerOption(option =>
+                    option.setName('numero')
+                        .setDescription('El número que crees que saldrá (1-20).')
+                        .setRequired(true)
+                        .setMinValue(1)
+                        .setMaxValue(20)
+                )
+                .addIntegerOption(option =>
                     option.setName('cantidad')
                         .setDescription('La cantidad de monedas a apostar.')
                         .setRequired(true)
                         .setMinValue(1)
-                )
-                .addStringOption(option =>
-                    option.setName('eleccion')
-                        .setDescription('Tu elección: "par" o "impar".')
-                        .setRequired(true)
-                        .addChoices(
-                            { name: 'PAR', value: 'par' },
-                            { name: 'IMPAR', value: 'impar' }
-                        )
                 )
         )
         .addSubcommandGroup(group =>
@@ -267,10 +265,10 @@ module.exports = {
 
             await interaction.reply({ embeds: [embed] });
 
-        } else if (subcommand === 'bet') {
+        } else if (subcommand === 'game') {
             const recipientUser = interaction.options.getUser("usuario");
+            const number = interaction.options.getInteger("numero");
             const amount = interaction.options.getInteger("cantidad");
-            const choice = interaction.options.getString("eleccion");
 
             if (userId === recipientUser.id) {
                 return await interaction.reply({
@@ -299,24 +297,27 @@ module.exports = {
                 await collection.insertOne(recipientData);
             }
 
+            const isEven = number % 2 === 0;
+            const creatorChoice = isEven ? 'par' : 'impar';
+
             const row = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`bet_accept_${userId}_${recipientUser.id}_${amount}_${choice}`)
+                        .setCustomId(`game_accept_${userId}_${recipientUser.id}_${amount}_${creatorChoice}`)
                         .setLabel('Aceptar Apuesta')
                         .setStyle(ButtonStyle.Primary),
                     new ButtonBuilder()
-                        .setCustomId(`bet_decline_${userId}_${recipientUser.id}`)
+                        .setCustomId(`game_decline_${userId}_${recipientUser.id}`)
                         .setLabel('Rechazar Apuesta')
                         .setStyle(ButtonStyle.Danger),
                 );
 
             const embed = new EmbedBuilder()
                 .setTitle("🎲 ¡Nueva Apuesta!")
-                .setDescription(`**${recipientUser.displayName}**, **${interaction.user.displayName}** te ha desafiado a una apuesta de **${amount}** monedas. Debes acertar si el número es **${choice.toUpperCase()}** o no.`)
+                .setDescription(`**${recipientUser.displayName}**, **${interaction.user.displayName}** te ha desafiado a una apuesta de **${amount}** monedas. El número a adivinar es **${number}**.`)
                 .addFields({
                     name: 'Instrucciones',
-                    value: 'Haz clic en el botón para aceptar la apuesta.',
+                    value: `El número elegido por ${interaction.user.displayName} es **${creatorChoice.toUpperCase()}**. Si aciertas, ganas.`,
                 })
                 .setColor("Purple")
                 .setTimestamp();
