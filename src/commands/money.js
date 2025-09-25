@@ -435,7 +435,7 @@ module.exports = {
         console.log("number:", number);
         // Obtener el ID del usuario que hizo clic
         const clickedUserId = interaction.user.id;
-
+        console.log("clicker:", number); 
         // Verificar si el usuario que hizo clic es el oponente.
         if (clickedUserId !== opponentId) {
             return await interaction.editReply({
