@@ -410,14 +410,15 @@ module.exports = {
         await interaction.deferReply({ ephemeral: true });
 
         // Descomponer los argumentos del customId
-        console.log("hola",interaction.customId.split('_'))
         const [action, challengerId, opponentId, amountStr, numberStr] = interaction.customId.split('_');
         const amount = parseInt(amountStr);
         const number = parseInt(numberStr);
 
         // 2. Verificar si el usuario que hizo clic es el oponente.
         console.log('ID del que pulsó:', interaction.user.id);
-        console.log('ID del oponente esperado:', opponentId);
+        console.log('ID del oponente esperado yo?:', opponentId);
+        console.log('ID del oponente esperado:', challengerId);
+
         if (interaction.user.id !== opponentId) {
             return await interaction.editReply({
                 content: "❌ Esta apuesta no es para ti."
