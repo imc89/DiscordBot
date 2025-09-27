@@ -46,32 +46,30 @@ module.exports = {
         if (!durationMs || durationMs < MIN_MS || durationMs > MAX_MS) {
             return interaction.reply({ 
                 content: '⚠️ El tiempo debe estar entre **5 minutos** (5m) y **1 hora** (1h), y en un formato válido (ej: 30m, 1h).', 
-                ephemeral: true // Solo visible para el usuario
+                ephemeral: true // Se mantiene privado SÓLO la advertencia de error
             });
         }
 
         const durationMinutes = Math.floor(durationMs / 60000);
         
-        // El mensaje de confirmación inicial seguirá siendo efímero (solo para el usuario)
+        // 2. Mensaje de confirmación inicial (AHORA PÚBLICO)
+        // AL ELIMINAR { ephemeral: true } el mensaje se envía al canal y es visible por todos.
         await interaction.reply({ 
-            content: `⏳ Temporizador de **${durationMinutes} minutos** para "**${task}**" iniciado. Te avisaré en este canal cuando termine.`,
-            ephemeral: true
+            content: `⏳ **Temporizador iniciado por ${interaction.user}** de **${durationMinutes} minutos** para la tarea: "${task}". ¡Avisaré aquí cuando acabe!`,
         });
 
-        // 2. Establecer el temporizador
+        // 3. Establecer el temporizador
         setTimeout(async () => {
             try {
-                // Envía el mensaje de aviso al canal donde se usó el comando
-                // Usamos interaction.channel.send para el aviso público
-                await interaction.channel.send(`🔔 ¡Ey ${interaction.user}! **¡Tu temporizador ha terminado!**\nLa tarea: **${task}** (${durationMinutes} minutos).`);
+                // Envía el mensaje de aviso final al canal (también público)
+                await interaction.channel.send(`🔔 ¡Ey ${interaction.user}! **¡Tu temporizador de ${durationMinutes} minutos ha terminado!** Tarea: **${task}**.`);
             } catch (error) {
-                console.error(`No se pudo enviar el mensaje de aviso en el canal ${interaction.channel.name}.`, error);
-                
-                // Si el bot no tiene permisos para enviar mensajes en el canal, intenta notificar al usuario de forma privada
+                console.error(`No se pudo enviar el mensaje de aviso en el canal.`, error);
+                // Intento de DM de respaldo en caso de fallo de permisos en el canal
                 try {
-                     await interaction.user.send(`⚠️ ¡Alerta! No pude avisar en el canal #${interaction.channel.name} (posiblemente por falta de permisos), pero tu temporizador de **${durationMinutes} minutos** para "**${task}**" ha terminado.`);
+                     await interaction.user.send(`⚠️ ¡Alerta! No pude avisar en el canal #${interaction.channel.name}, pero tu temporizador de **${durationMinutes} minutos** para "**${task}**" ha terminado.`);
                 } catch (dmError) {
-                    console.error(`Fallo catastrófico: No se pudo avisar al usuario ${interaction.user.tag} ni en el canal ni por DM.`, dmError);
+                    console.error(`Fallo catastrófico: No se pudo avisar al usuario ${interaction.user.tag}.`, dmError);
                 }
             }
         }, durationMs);
