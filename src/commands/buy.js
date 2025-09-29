@@ -3,7 +3,6 @@ const { MongoClient } = require("mongodb");
 const path = require('path');
 
 // Configura tu cadena de conexión a MongoDB
-// Usamos el mismo patrón de URI y cliente que en el archivo law_money.js
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_USER}.patcutg.mongodb.net/?retryWrites=true&w=majority&appName=${process.env.DB_USER}`;
 const client = new MongoClient(uri);
 
@@ -19,10 +18,11 @@ module.exports = {
         .setDescription("Compra una bebida para refrescarte."),
 
     async execute(interaction) {
-        // Deferir la respuesta para evitar el timeout
+        // CORRECCIÓN CRÍTICA: Deferir la respuesta inmediatamente.
+        // Esto previene el error DiscordAPIError[10062]: Unknown interaction
         await interaction.deferReply({ ephemeral: false });
 
-        // Conectar a la DB
+        // Conectar a la DB DESPUÉS del deferReply
         try {
             await client.connect();
             const db = client.db("discord_bot");
@@ -61,6 +61,7 @@ module.exports = {
 
         } catch (error) {
             console.error("Error al conectar o interactuar con MongoDB:", error);
+            // Usamos editReply porque ya hicimos deferReply
             await interaction.editReply({ content: "❌ Hubo un error al intentar acceder a la tienda. Inténtalo de nuevo más tarde.", ephemeral: true });
         }
     },
@@ -86,7 +87,7 @@ module.exports = {
             let userData = await collection.findOne({ userId });
 
             if (!userData) {
-                // Crear usuario si no existe (debería existir por el comando law_money, pero es una seguridad)
+                // Crear usuario si no existe
                 userData = {
                     userId,
                     username: interaction.user.username,
@@ -103,11 +104,14 @@ module.exports = {
 
             // 1. Verificar si el usuario tiene suficiente dinero
             if (currentBalance < price) {
-                await interaction.editReply({
+                // Usar followUp en interacciones diferidas (deferUpdate)
+                await interaction.followUp({
                     content: `❌ ¡Lo sentimos! No tienes suficientes monedas para comprar **${drink.name}**. Necesitas **${price}** monedas y solo tienes **${currentBalance}**.`,
-                    embeds: [],
-                    components: [] // Elimina el menú desplegable
+                    ephemeral: true
                 });
+                
+                // Si quieres que el mensaje original del menú se borre:
+                await interaction.message.edit({ components: [] });
                 return;
             }
 
@@ -119,10 +123,6 @@ module.exports = {
             );
 
             // 3. Crear la respuesta de compra exitosa
-            // Nota: Discord no permite adjuntar imágenes de rutas locales directamente en un embed para la mayoría de las interacciones.
-            // Para que esto funcione, la imagen debe ser un archivo adjunto al mensaje o una URL pública.
-            // Aquí se adjuntará como archivo para simular la entrega del producto.
-
             const attachmentPath = path.resolve(__dirname, '..', '..', 'img', 'drinks', drink.imageFile);
 
             const embed = new EmbedBuilder()
@@ -153,6 +153,3 @@ module.exports = {
         }
     }
 };
-
-// **IMPORTANTE**: Necesitas exportar y manejar el 'handleSelectMenuInteraction' en tu 'client.on(Events.InteractionCreate, ...)'
-// de tu archivo principal (ej: index.js o bot.js) para que funcione la lógica del menú desplegable, similar a como manejas 'handleButtonInteraction' en law_money.js.
