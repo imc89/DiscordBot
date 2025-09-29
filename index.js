@@ -8,6 +8,7 @@ const express = require('express');
 
 // Import the command directly
 const lawMoneyCommand = require('./src/commands/money.js');
+const lawBuyCommand = require('./src/commands/buy.js'); // **<-- ESTO ES LO QUE FALTA**
 
 // ========================
 // Bot Configuration
