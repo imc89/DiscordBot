@@ -9,8 +9,9 @@ const client = new MongoClient(uri);
 
 // Definición de las bebidas disponibles
 const drinks = [
-    { name: "Prueba 1", price: 5, id: "prueba_1", imageFile: "prueba_1.gif" },
-    { name: "Prueba 2", price: 15, id: "prueba_2", imageFile: "prueba_2.gif" },
+    { name: "Veridian", price: 5, id: "Veridian", imageFile: "Veridian.gif" },
+    { name: "Ascua", price: 15, id: "Ascua", imageFile: "Ascua.gif" },
+    { name: "Cerveza", price: 25, id: "Cerveza", imageFile: "Cerveza.gif" },
 ];
 
 module.exports = {
