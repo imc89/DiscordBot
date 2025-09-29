@@ -123,7 +123,7 @@ module.exports = {
             // Para que esto funcione, la imagen debe ser un archivo adjunto al mensaje o una URL pública.
             // Aquí se adjuntará como archivo para simular la entrega del producto.
 
-            const attachmentPath = path.resolve(__dirname, '..', 'img', 'drinks', drink.imageFile);
+            const attachmentPath = path.resolve(__dirname, '..', '..', 'img', 'drinks', drink.imageFile);
 
             const embed = new EmbedBuilder()
                 .setTitle("✅ Compra Exitosa")
