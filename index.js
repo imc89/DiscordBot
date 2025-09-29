@@ -69,7 +69,7 @@ client.on(Events.InteractionCreate, async interaction => {
     
     // ADDED: Handle button interactions
     if (interaction.isButton()) {
-        if (interaction.customId.startsWith('game_')) {
+        if (interaction.customId.startsWith('game_') || interaction.customId.startsWith('buy_')) {
             try {
                 await lawMoneyCommand.handleButtonInteraction(interaction);
             } catch (error) {
