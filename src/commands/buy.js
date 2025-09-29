@@ -127,7 +127,7 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setTitle("✅ Compra Exitosa")
-                .setDescription(`**DISFRUTA DE TU BEBIDA ${drink.name.toUpperCase()}**`)
+                .setDescription(`**DISFRUTA DE TU ${drink.name.toUpperCase()}**`)
                 .addFields(
                     { name: 'Costo', value: `**${price}** monedas`, inline: true },
                     { name: 'Balance Restante', value: `**${newBalance}** monedas`, inline: true }
