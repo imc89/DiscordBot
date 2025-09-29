@@ -66,18 +66,28 @@ client.on(Events.InteractionCreate, async interaction => {
             }
         }
     }
-    
+
     // ADDED: Handle button interactions
     if (interaction.isButton()) {
         if (interaction.customId.startsWith('game_') || interaction.customId.startsWith('buy_')) {
+            // Asume que lawMoneyCommand tiene el manejo de botones (como en tu ejemplo)
             try {
                 await lawMoneyCommand.handleButtonInteraction(interaction);
             } catch (error) {
+                // ... manejo de errores
+            }
+        }
+    } else if (interaction.isStringSelectMenu()) { // <-- NUEVO: Manejar Select Menus
+        if (interaction.customId.startsWith('buy_')) { // Puedes verificar si empieza con 'buy_'
+            try {
+                // Llama a la función que maneja el select menu en buy.js
+                await lawBuyCommand.handleSelectMenuInteraction(interaction);
+            } catch (error) {
                 console.error(error);
                 if (!interaction.replied && !interaction.deferred) {
-                    await interaction.reply({ content: 'There was an error processing this button action.', ephemeral: true });
+                    await interaction.reply({ content: 'There was an error processing this selection.', ephemeral: true });
                 } else {
-                    await interaction.followUp({ content: 'There was an error processing this button action.', ephemeral: true });
+                    await interaction.followUp({ content: 'There was an error processing this selection.', ephemeral: true });
                 }
             }
         }

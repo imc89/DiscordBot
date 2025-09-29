@@ -19,15 +19,14 @@ module.exports = {
         .setDescription("Compra una bebida para refrescarte."),
 
     async execute(interaction) {
-        // Deferir la respuesta para evitar el timeout
-        await interaction.deferReply({ ephemeral: false });
+        // Deferir la respuesta **inmediatamente** para evitar el timeout de Discord.
+        await interaction.deferReply({ ephemeral: false }).catch(console.error); // Añade .catch para seguridad
 
-        // Conectar a la DB
+        // Ahora puedes tomarte tu tiempo para conectar a la DB
         try {
-            await client.connect();
+            await client.connect(); // Esta operación ahora tiene más tiempo para ejecutarse
             const db = client.db("discord_bot");
             const collection = db.collection("money");
-
             const userId = interaction.user.id;
             const userData = await collection.findOne({ userId });
             const currentBalance = userData ? userData.balance : 0;
@@ -142,7 +141,7 @@ module.exports = {
                 files: [attachmentPath], // Adjuntar el archivo de imagen
                 components: [] // Eliminar el menú
             });
-            
+
             // Opcional: enviar un mensaje de confirmación al usuario (ephemeral)
             await interaction.followUp({ content: `¡Has comprado **${drink.name}**!`, ephemeral: true });
 
