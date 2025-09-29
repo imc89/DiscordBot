@@ -2,9 +2,25 @@ const { SlashCommandBuilder, EmbedBuilder, StringSelectMenuBuilder, StringSelect
 const { MongoClient } = require("mongodb");
 const path = require('path');
 
-// Configura tu cadena de conexión a MongoDB
+// =========================================================
+// 1. CONFIGURACIÓN Y CLIENTE GLOBAL DE MONGODB
+// =========================================================
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_USER}.patcutg.mongodb.net/?retryWrites=true&w=majority&appName=${process.env.DB_USER}`;
 const client = new MongoClient(uri);
+
+// Función para obtener la base de datos, asegurando la conexión
+async function getDbCollection() {
+    // Si el cliente no está conectado, intenta conectarse.
+    // Esto es robusto para entornos con desconexiones ocasionales.
+    if (!client.topology || !client.topology.isConnected()) {
+        console.log("Reconectando a MongoDB...");
+        await client.connect();
+        console.log("Reconexión a MongoDB exitosa.");
+    }
+    const db = client.db("discord_bot");
+    return db.collection("money");
+}
+// =========================================================
 
 // Definición de las bebidas disponibles
 const drinks = [
@@ -18,29 +34,27 @@ module.exports = {
         .setDescription("Compra una bebida para refrescarte."),
 
     async execute(interaction) {
-        // CORRECCIÓN CRÍTICA: Deferir la respuesta inmediatamente.
-        // Esto previene el error DiscordAPIError[10062]: Unknown interaction
+        // CORRECCIÓN CRÍTICA: 
+        // 1. Deferir la respuesta INMEDIATAMENTE. Esto cumple el requisito de 3s de Discord.
         await interaction.deferReply({ ephemeral: false });
 
-        // Conectar a la DB DESPUÉS del deferReply
+        // 2. Ahora que hemos diferido, tenemos tiempo para la operación de DB
         try {
-            await client.connect();
-            const db = client.db("discord_bot");
-            const collection = db.collection("money");
+            // Obtener la colección de forma robusta
+            const collection = await getDbCollection();
 
             const userId = interaction.user.id;
             const userData = await collection.findOne({ userId });
             const currentBalance = userData ? userData.balance : 0;
 
-            // Crear las opciones para el menú desplegable
+            // Crear las opciones para el menú desplegable (omito código por brevedad)
             const options = drinks.map(drink =>
                 new StringSelectMenuOptionBuilder()
                     .setLabel(`${drink.name} - ${drink.price}$`)
-                    .setValue(drink.id) // Usaremos el ID para identificar la opción seleccionada
+                    .setValue(drink.id)
                     .setDescription(`Costo: ${drink.price} monedas.`)
             );
 
-            // Crear el menú desplegable
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId('buy_drink_select')
                 .setPlaceholder('Selecciona la bebida que deseas comprar...')
@@ -54,14 +68,15 @@ module.exports = {
                 .setColor("LuminousVividPink")
                 .setTimestamp();
 
+            // Usar editReply porque ya hicimos deferReply
             await interaction.editReply({
                 embeds: [embed],
                 components: [row]
             });
 
         } catch (error) {
-            console.error("Error al conectar o interactuar con MongoDB:", error);
-            // Usamos editReply porque ya hicimos deferReply
+            console.error("Error al acceder a la tienda o DB:", error);
+            // Usar editReply porque ya hicimos deferReply
             await interaction.editReply({ content: "❌ Hubo un error al intentar acceder a la tienda. Inténtalo de nuevo más tarde.", ephemeral: true });
         }
     },
@@ -69,25 +84,25 @@ module.exports = {
     async handleSelectMenuInteraction(interaction) {
         if (!interaction.isStringSelectMenu() || interaction.customId !== 'buy_drink_select') return;
 
-        await interaction.deferUpdate(); // Deferir la actualización para que el usuario sepa que se está procesando
+        // CRÍTICO: Deferir la actualización INMEDIATAMENTE
+        await interaction.deferUpdate(); 
 
         const selectedDrinkId = interaction.values[0];
         const drink = drinks.find(d => d.id === selectedDrinkId);
 
         if (!drink) {
+            // Usamos followUp en interacciones diferidas (deferUpdate)
             return await interaction.followUp({ content: "❌ Bebida no encontrada.", ephemeral: true });
         }
 
         try {
-            await client.connect();
-            const db = client.db("discord_bot");
-            const collection = db.collection("money");
+            // Obtener la colección de forma robusta
+            const collection = await getDbCollection();
 
             const userId = interaction.user.id;
             let userData = await collection.findOne({ userId });
 
             if (!userData) {
-                // Crear usuario si no existe
                 userData = {
                     userId,
                     username: interaction.user.username,
@@ -104,13 +119,12 @@ module.exports = {
 
             // 1. Verificar si el usuario tiene suficiente dinero
             if (currentBalance < price) {
-                // Usar followUp en interacciones diferidas (deferUpdate)
                 await interaction.followUp({
                     content: `❌ ¡Lo sentimos! No tienes suficientes monedas para comprar **${drink.name}**. Necesitas **${price}** monedas y solo tienes **${currentBalance}**.`,
                     ephemeral: true
                 });
                 
-                // Si quieres que el mensaje original del menú se borre:
+                // Borrar el menú después de un error para que no se pueda volver a intentar.
                 await interaction.message.edit({ components: [] });
                 return;
             }
@@ -122,7 +136,7 @@ module.exports = {
                 { $set: { balance: newBalance } }
             );
 
-            // 3. Crear la respuesta de compra exitosa
+            // 3. Respuesta de compra exitosa
             const attachmentPath = path.resolve(__dirname, '..', '..', 'img', 'drinks', drink.imageFile);
 
             const embed = new EmbedBuilder()
@@ -132,18 +146,19 @@ module.exports = {
                     { name: 'Costo', value: `**${price}** monedas`, inline: true },
                     { name: 'Balance Restante', value: `**${newBalance}** monedas`, inline: true }
                 )
-                .setImage(`attachment://${drink.imageFile}`) // Referencia al archivo adjunto
+                .setImage(`attachment://${drink.imageFile}`)
                 .setColor("Green")
                 .setTimestamp();
 
+            // Usar edit para actualizar el mensaje del menú a la confirmación de compra
             await interaction.message.edit({
                 content: null,
                 embeds: [embed],
-                files: [attachmentPath], // Adjuntar el archivo de imagen
+                files: [attachmentPath],
                 components: [] // Eliminar el menú
             });
             
-            // Opcional: enviar un mensaje de confirmación al usuario (ephemeral)
+            // Confirmación efímera (privada) para el usuario
             await interaction.followUp({ content: `¡Has comprado **${drink.name}**!`, ephemeral: true });
 
 
