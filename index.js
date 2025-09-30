@@ -70,15 +70,41 @@ client.on(Events.InteractionCreate, async interaction => {
 
     // ADDED: Handle button interactions
     if (interaction.isButton()) {
-        if (interaction.customId.startsWith('game_') || interaction.customId.startsWith('buy_')) {
+        const customId = interaction.customId;
+
+        // 1. Botones de los comandos 'money' y 'buy'
+        if (customId.startsWith('game_') || customId.startsWith('buy_')) {
             // Asume que lawMoneyCommand tiene el manejo de botones (como en tu ejemplo)
             try {
                 await lawMoneyCommand.handleButtonInteraction(interaction);
             } catch (error) {
-                // ... manejo de errores
+                console.error("Error al manejar el botón de lawMoney:", error);
+                // Responde a la interacción para evitar el mensaje de error de Discord
+                if (!interaction.deferred && !interaction.replied) {
+                    await interaction.reply({ content: '❌ Error al procesar este botón.', ephemeral: true }).catch(() => { });
+                }
             }
+            return;
         }
-    } else if (interaction.isStringSelectMenu()) { // <-- NUEVO: Manejar Select Menus
+
+        // 2. Botones del comando 'law_chess' (Aceptar/Rechazar)
+        if (customId === 'law_chest_accept' || customId === 'law_chest_decline') {
+
+            // **IMPORTANTE:** La lógica de estos botones se maneja internamente
+            // mediante un Collector dentro del comando /law_chess.
+            // Simplemente necesitamos asegurar que el bot no se cuelgue si el collector ya caducó.
+
+            // Si la interacción llega aquí, el collector ya no está escuchando
+            // o ya se respondió. Respondemos discretamente si aún no se ha hecho.
+            if (!interaction.deferred && !interaction.replied) {
+                await interaction.reply({ content: 'Esta partida ya ha sido gestionada o caducó.', ephemeral: true }).catch(() => { });
+            }
+            return;
+        }
+    }
+
+    // --- Manejo de Interacciones con Select Menus ---
+    if (interaction.isStringSelectMenu()) {
         // Verifica si el customId corresponde a la lógica de law_buy (compra o regalo)
         if (interaction.customId === 'buy_drink_select' || interaction.customId.startsWith('gift_select_')) {
             try {
