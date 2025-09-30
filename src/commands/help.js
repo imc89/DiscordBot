@@ -6,9 +6,12 @@ const commandsInfo = {
         description: 'Comandos disponibles para todos los miembros.',
         commands: [
             { name: '🔎 /law_channel <pregunta>', value: 'Te ayudo a encontrar canales relevantes para el tema que busques.' },
+            { name: '💬 /law_quote <nombre>', value: 'Te da una cita famosa de un escritor, famoso o filósofo, generada por IA.' },
             { name: '🖼️ /law_img <@usuario>', value: 'Analizo la foto de perfil de un usuario usando IA.' },
             { name: '👤 /law_data <@usuario>', value: 'Te muestro toda la información pública sobre un usuario.' },
+            { name: '💖 /law_ship <@usuario1> <@usuario2>', value: 'Mide el porcentaje de compatibilidad entre dos usuarios.' },
             { name: '🏓 /law_ping', value: 'Mide la latencia del bot con el servidor de Discord.' },
+            { name: '⏲️ /law_timer <tiempo> <tarea>', value: 'Establece un temporizador entre 5 minutos y 1 hora para una tarea específica.' },
         ],
     },
     'Economia': {
@@ -22,6 +25,7 @@ const commandsInfo = {
             { name: '🎰 /law_money slot <cantidad>', value: 'Juega a las tragamonedas para ganar o perder monedas.' },
             { name: '🤫 /law_money rob <@usuario>', value: 'Intenta robarle a otro usuario.' },
             { name: '🏆 /law_money rank', value: 'Muestra el ranking de los usuarios más ricos.' },
+            { name: '🍹 /law_buy', value: 'Compra bebidas virtuales para disfrutar en el servidor.' },
         ],
     },
     'Moderacion': {
