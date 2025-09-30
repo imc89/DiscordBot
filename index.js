@@ -79,16 +79,17 @@ client.on(Events.InteractionCreate, async interaction => {
             }
         }
     } else if (interaction.isStringSelectMenu()) { // <-- NUEVO: Manejar Select Menus
-        if (interaction.customId.startsWith('buy_')) { // Puedes verificar si empieza con 'buy_'
+        // Verifica si el customId corresponde a la lógica de law_buy (compra o regalo)
+        if (interaction.customId === 'buy_drink_select' || interaction.customId.startsWith('gift_select_')) {
             try {
-                // Llama a la función que maneja el select menu en buy.js
+                // Llama a la función que maneja el select menu en law_buy.js
                 await lawBuyCommand.handleSelectMenuInteraction(interaction);
             } catch (error) {
-                console.error(error);
+                console.error("Error al manejar el Select Menu de law_buy:", error);
                 if (!interaction.replied && !interaction.deferred) {
-                    await interaction.reply({ content: 'There was an error processing this selection.', ephemeral: true });
+                    await interaction.reply({ content: '❌ Hubo un error al procesar esta selección.', ephemeral: true });
                 } else {
-                    await interaction.followUp({ content: 'There was an error processing this selection.', ephemeral: true });
+                    await interaction.followUp({ content: '❌ Hubo un error al procesar esta selección.', ephemeral: true });
                 }
             }
         }
