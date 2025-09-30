@@ -26,6 +26,7 @@ const commandsInfo = {
             { name: '🤫 /law_money rob <@usuario>', value: 'Intenta robarle a otro usuario.' },
             { name: '🏆 /law_money rank', value: 'Muestra el ranking de los usuarios más ricos.' },
             { name: '🍹 /law_buy', value: 'Compra bebidas virtuales para disfrutar en el servidor.' },
+            { name: '🤝 /law_buy invite <@usuario>', value: 'Invita a un usuario a una bebida pagada por ti.' }, 
         ],
     },
     'Moderacion': {
