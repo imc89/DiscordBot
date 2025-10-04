@@ -8,29 +8,25 @@ const allowedUsers = ['852486349520371744', '1056942076480201801'];
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_USER}.patcutg.mongodb.net/?retryWrites=true&w=majority&appName=${process.env.DB_USER}`;
 const client = new MongoClient(uri);
 
-// URL de la moneda AXIOS para el embed 
-const AXIOS_COIN_IMAGE_URL = '../../img/money/axios.png';
-
-
 // Array con mensajes y recompensas para el comando de trabajo
 const jobRewards = [
-    // --- Ganancias significativas (Raras, +2500 a +4000) ---
-    { message: "¡Éxito! Has completado un trabajo de **alto riesgo** para un cliente secreto. Ganancia espectacular de **{amount} {coin}**.", amount: 4000 },
-    { message: "Mientras buscabas, encontraste una **caja fuerte abandonada** con **{amount} {coin}**.", amount: 2500 },
+    // --- Ganancias significativas (Raras, +250 a +400) ---
+    { message: "¡Éxito! Has completado un trabajo de **alto riesgo** para un cliente secreto. Ganancia espectacular de **{amount}**$.", amount: 4000 },
+    { message: "Mientras buscabas, encontraste una **caja fuerte abandonada** con **{amount}**$.", amount: 2500 },
     
-    // --- Ganancias normales (Comunes, +750 a +1500) ---
-    { message: "Has entregado varios pedidos y recibido tu **paga semanal de {amount} {coin}**.", amount: 1500 },
-    { message: "Terminaste tu turno. Es un **día lento**, pero ganas **{amount} {coin}**.", amount: 750 },
-    { message: "Desactivaste un software malicioso de un usuario. Te recompensó con **{amount} {coin}**.", amount: 1000 },
-    { message: "Te enfrentaste a un ladrón y recuperaste un botín. La policía te dio una recompensa de **{amount} {coin}**.", amount: 1200 },
+    // --- Ganancias normales (Comunes, +75 a +150) ---
+    { message: "Has entregado varios pedidos y recibido tu **paga semanal de {amount}**$.", amount: 1500 },
+    { message: "Terminaste tu turno. Es un **día lento**, pero ganas **{amount}**$.", amount: 750 },
+    { message: "Desactivaste un software malicioso de un usuario. Te recompensó con **{amount}**$.", amount: 1000 },
+    { message: "Te enfrentaste a un ladrón y recuperaste un botín. La policía te dio una recompensa de **{amount}**$.", amount: 1200 },
 
     // --- Resultados Neutros (Muy Comunes, 0) ---
     { message: "Tu trabajo fue **cancelado** por problemas técnicos. No ganas, pero tampoco pierdes.", amount: 0 },
 
-    // --- Pérdidas (Negativos, -1000 a -3000) ---
-    { message: "Recibiste una multa por **tráfico ilegal de datos** en tu trabajo. Has perdido **{amount} {coin}**.", amount: -1000 },
-    { message: "Fallaste un cálculo y tienes que **cubrir los daños** de un cliente. Pierdes **{amount} {coin}**.", amount: -1500 },
-    { message: "¡Oops! Una auditoría inesperada te obliga a pagar **impuestos atrasados** por **{amount} {coin}**.", amount: -3000 }, // Pérdida alta
+    // --- Pérdidas (Negativos, -100 a -300) ---
+    { message: "Recibiste una multa por **tráfico ilegal de datos** en tu trabajo. Has perdido **{amount}**$.", amount: -1000 },
+    { message: "Fallaste un cálculo y tienes que **cubrir los daños** de un cliente. Pierdes **{amount}**$.", amount: -1500 },
+    { message: "¡Oops! Una auditoría inesperada te obliga a pagar **impuestos atrasados** por **{amount}**$.", amount: -3000 }, // Pérdida alta
 ];
 
 module.exports = {
@@ -224,10 +220,7 @@ module.exports = {
             }
 
             const randomReward = jobRewards[Math.floor(Math.random() * jobRewards.length)];
-            const jobReward = randomReward.message
-                .replace('{amount}', Math.abs(jobReward))
-                .replace('{coin}', AXIOS_COIN_IMAGE_URL);
-
+            const jobReward = randomReward.amount;
             const newBalance = userData.balance + jobReward;
             await collection.updateOne(
                 { userId },
