@@ -510,12 +510,32 @@ module.exports = {
             let newTargetBalance;
             let embed;
 
+            // Rango de porcentaje a robar de la víctima: 10% a 20%
+            const MIN_ROB_PERCENT = 0.10;
+            const MAX_ROB_PERCENT = 0.20;
+
+            // Rango de porcentaje de penalización del ladrón: 15% a 30%
+            const MIN_PENALTY_PERCENT = 0.15;
+            const MAX_PENALTY_PERCENT = 0.30;
+            // Penalización mínima garantizada (para que los balances bajos sigan sintiendo el castigo)
+            const MIN_FLAT_PENALTY = 100;
+
+
             if (robSuccess) {
-                robAmount = Math.floor(Math.random() * (targetData.balance * 0.2 - targetData.balance * 0.1 + 1)) + (targetData.balance * 0.1);
-                robAmount = Math.floor(robAmount); // Asegura que sea un entero
+                // 1. Calcula el porcentaje aleatorio a robar (entre 10% y 20%)
+                const robPercentage = Math.random() * (MAX_ROB_PERCENT - MIN_ROB_PERCENT) + MIN_ROB_PERCENT;
+
+                // 2. Calcula la cantidad real basada en el balance de la VÍCTIMA
+                let robAmount = Math.floor(targetData.balance * robPercentage);
+
+                // Aseguramos que la cantidad robada no sea cero si el porcentaje es pequeño
+                if (robAmount < 1) robAmount = 1;
 
                 newRobberBalance = userData.balance + robAmount;
                 newTargetBalance = targetData.balance - robAmount;
+
+                // Si la víctima queda con balance negativo (teóricamente no debería pasar si tiene más de 100)
+                if (newTargetBalance < 0) newTargetBalance = 0;
 
                 await collection.updateOne({ userId }, { $set: { balance: newRobberBalance } });
                 await collection.updateOne({ userId: targetId }, { $set: { balance: newTargetBalance } });
@@ -530,8 +550,25 @@ module.exports = {
                     .setColor("Green")
                     .setTimestamp();
             } else {
-                const penaltyAmount = Math.floor(Math.random() * (100 - 50 + 1)) + 50;
+                // 1. Calcula el porcentaje aleatorio de penalización (entre 15% y 30%)
+                const penaltyPercentage = Math.random() * (MAX_PENALTY_PERCENT - MIN_PENALTY_PERCENT) + MIN_PENALTY_PERCENT;
+
+                // 2. Calcula la cantidad real basada en el balance del LADRÓN
+                let penaltyAmount = Math.floor(userData.balance * penaltyPercentage);
+
+                // 3. Aplica una penalización mínima si la cantidad calculada es demasiado baja
+                if (penaltyAmount < MIN_FLAT_PENALTY) {
+                    penaltyAmount = MIN_FLAT_PENALTY;
+                }
+
                 newRobberBalance = userData.balance - penaltyAmount;
+
+                // Evita que el balance del ladrón sea negativo
+                if (newRobberBalance < 0) {
+                    // La penalización real es solo lo que le quedaba al usuario
+                    penaltyAmount = userData.balance;
+                    newRobberBalance = 0;
+                }
 
                 await collection.updateOne({ userId }, { $set: { balance: newRobberBalance } });
 
