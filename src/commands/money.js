@@ -2,7 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const { MongoClient } = require("mongodb");
 
 // Define los IDs de los usuarios que pueden usar el comando de gestión
-const allowedUsers = ['852486349520371744', '1056942076480201801'];
+const allowedUsers = ['852486349520371744', '1056942076480204801'];
 
 // Configura tu cadena de conexión a MongoDB
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_USER}.patcutg.mongodb.net/?retryWrites=true&w=majority&appName=${process.env.DB_USER}`;
