@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events } = require("discord.js");
-// **[CORRECCIÓN DE RUTA]** Cambiado de '../index.js' a '../../index.js' (ajusta si es necesario)
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require("discord.js");
+// **[RUTA CORREGIDA]** De acuerdo a tu estructura /src/commands/
 const { getMoneyCollection } = require('../../index.js'); 
 
 // Define los IDs de los usuarios que pueden usar el comando de gestión
@@ -7,27 +7,22 @@ const allowedUsers = ['852486349520371744', '1056942076480204801'];
 
 // Array con mensajes y recompensas para el comando de trabajo
 const jobRewards = [
-    // --- Ganancias significativas (Raras, +250 a +400) ---
+    // ... (Your jobRewards array remains the same)
     { message: "¡Éxito! Has completado un trabajo de **alto riesgo** para un cliente secreto. Ganancia espectacular de **{amount}**$.", amount: 4000 },
     { message: "Mientras buscabas, encontraste una **caja fuerte abandonada** con **{amount}**$.", amount: 2500 },
-    
-    // --- Ganancias normales (Comunes, +75 a +150) ---
     { message: "Has entregado varios pedidos y recibido tu **paga semanal de {amount}**$.", amount: 1500 },
     { message: "Terminaste tu turno. Es un **día lento**, pero ganas **{amount}**$.", amount: 750 },
     { message: "Desactivaste un software malicioso de un usuario. Te recompensó con **{amount}**$.", amount: 1000 },
     { message: "Te enfrentaste a un ladrón y recuperaste un botín. La policía te dio una recompensa de **{amount}**$.", amount: 1200 },
-
-    // --- Resultados Neutros (Muy Comunes, 0) ---
     { message: "Tu trabajo fue **cancelado** por problemas técnicos. No ganas, pero tampoco pierdes.", amount: 0 },
-
-    // --- Pérdidas (Negativos, -100 a -300) ---
     { message: "Recibiste una multa por **tráfico ilegal de datos** en tu trabajo. Has perdido **{amount}**$.", amount: -1000 },
     { message: "Fallaste un cálculo y tienes que **cubrir los daños** de un cliente. Pierdes **{amount}**$.", amount: -1500 },
-    { message: "¡Oops! Una auditoría inesperada te obliga a pagar **impuestos atrasados** por **{amount}**$.", amount: -3000 }, // Pérdida alta
+    { message: "¡Oops! Una auditoría inesperada te obliga a pagar **impuestos atrasados** por **{amount}**$.", amount: -3000 }, 
 ];
 
 module.exports = {
     data: new SlashCommandBuilder()
+        // ... (Your SlashCommandBuilder data remains the same)
         .setName("law_money")
         .setDescription("Gestiona el sistema de dinero del servidor.")
         .addSubcommand(subcommand =>
@@ -143,8 +138,14 @@ module.exports = {
 
 
     async execute(interaction) {
-        // Deferir la respuesta primero.
-        await interaction.deferReply({ ephemeral: false });
+        // **[CORRECCIÓN CLAVE 1]** Intenta deferir la respuesta inmediatamente. 
+        // Usamos ephemeral: true para aumentar la velocidad de respuesta, aunque la respuesta final sea pública.
+        try {
+            await interaction.deferReply({ ephemeral: true });
+        } catch (e) {
+            // Si falla, el token expiró (Error 10062). No podemos hacer nada más.
+            return; 
+        }
 
         try {
             // Obtener la colección ya conectada
@@ -179,9 +180,10 @@ module.exports = {
                     const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
                     const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
+                    // **[CORRECCIÓN DE WARNING]** Usamos editReply ya que ya deferimos.
                     return await interaction.editReply({
                         content: `⏰ Ya has reclamado tu recompensa diaria. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral // Reemplaza ephemeral: true
                     });
                 }
 
@@ -198,6 +200,7 @@ module.exports = {
                     .setColor("Gold")
                     .setTimestamp();
 
+                // **[CORRECCIÓN CLAVE 2]** La respuesta final es pública (no tiene flags: 64)
                 await interaction.editReply({ embeds: [embed] });
 
             } else if (subcommand === 'job') {
@@ -210,9 +213,10 @@ module.exports = {
                     const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
                     const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
+                    // **[CORRECCIÓN DE WARNING]** Usamos editReply ya que ya deferimos.
                     return await interaction.editReply({
                         content: `⏰ Ya has completado un trabajo recientemente. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
@@ -260,14 +264,14 @@ module.exports = {
                 if (userId === recipientUser.id) {
                     return await interaction.editReply({
                         content: "❌ No puedes transferir dinero a ti mismo.",
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
                 if (userData.balance < amount) {
                     return await interaction.editReply({
                         content: `❌ No tienes suficientes monedas para transferir **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
@@ -311,14 +315,14 @@ module.exports = {
                 if (userId === recipientUser.id) {
                     return await interaction.editReply({
                         content: "❌ No puedes apostar contra ti mismo.",
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
                 if (userData.balance < amount) {
                     return await interaction.editReply({
                         content: `❌ No tienes suficientes monedas para apostar **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
@@ -326,7 +330,7 @@ module.exports = {
                 if (!recipientData || recipientData.balance < amount) {
                     return await interaction.editReply({
                         content: `❌ El usuario **${recipientUser.displayName}** no tiene suficientes monedas para aceptar la apuesta de **${amount}**.`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
@@ -358,7 +362,8 @@ module.exports = {
 
                 await interaction.editReply({
                     embeds: [embed],
-                    components: [row]
+                    components: [row],
+                    flags: MessageFlags.Ephemeral // La notificación de desafío es privada al inicio
                 });
 
             } else if (subcommand === 'rank') {
@@ -392,7 +397,7 @@ module.exports = {
                 if (!allowedUsers.includes(userId)) {
                     return await interaction.editReply({
                         content: "❌ No tienes permiso para usar este comando de gestión.",
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
@@ -406,7 +411,7 @@ module.exports = {
                         .setColor("Blurple")
                         .setTimestamp();
 
-                    await interaction.editReply({ embeds: [embed] });
+                    await interaction.editReply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
                 } else if (subcommand === 'edit') {
                     const userToEdit = interaction.options.getUser("usuario");
@@ -430,7 +435,7 @@ module.exports = {
                         .setColor("DarkBlue")
                         .setTimestamp();
 
-                    await interaction.editReply({ embeds: [embed] });
+                    await interaction.editReply({ embeds: [embed], flags: MessageFlags.Ephemeral });
                 }
             } else if (subcommand === 'slot') {
                 const amount = interaction.options.getInteger("cantidad");
@@ -438,7 +443,7 @@ module.exports = {
                 if (userData.balance < amount) {
                     return await interaction.editReply({
                         content: `❌ No tienes suficientes monedas para apostar **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
@@ -497,7 +502,7 @@ module.exports = {
                 if (userId === targetId) {
                     return await interaction.editReply({
                         content: "❌ No puedes robarte a ti mismo.",
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
@@ -506,7 +511,7 @@ module.exports = {
                 if (!targetData || targetData.balance < 100) {
                     return await interaction.editReply({
                         content: `❌ El usuario **${targetUser.displayName}** no tiene suficientes monedas para ser robado (necesita al menos 100 monedas).`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
@@ -592,20 +597,24 @@ module.exports = {
                 await interaction.editReply({ embeds: [embed] });
             }
         } catch (error) {
-            // Maneja cualquier error de DB/lógica
+            // **[CORRECCIÓN CLAVE 3]** Ya que deferimos, siempre usamos editReply aquí.
             console.error("Error en el comando law_money:", error);
-            // Edita la respuesta para que el usuario no vea "La aplicación no ha respondido"
             await interaction.editReply({
                 content: "❌ Ha ocurrido un error interno. Inténtalo de nuevo más tarde o contacta a un administrador.",
-                ephemeral: true
-            }).catch(e => console.error("No se pudo enviar la respuesta de error:", e));
+                flags: MessageFlags.Ephemeral
+            }).catch(e => console.error("No se pudo enviar la respuesta de error (después de deferral):", e));
         }
     },
 
     async handleButtonInteraction(interaction) {
         if (!interaction.isButton() || !interaction.customId.startsWith('game_')) return;
 
-        await interaction.deferReply({ ephemeral: true });
+        // **[CORRECCIÓN CLAVE 1]** Deferir el botón inmediatamente
+        try {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        } catch (e) {
+            return;
+        }
 
         // Descomponer el customId.
         const parts = interaction.customId.split('_');
@@ -639,6 +648,7 @@ module.exports = {
 
             // Validar fondos y usuarios
             if (!challengerData || challengerData.balance < amount || !opponentData || opponentData.balance < amount) {
+                // Si falla, removemos los botones y notificamos.
                 await interaction.message.edit({ components: [] });
                 return await interaction.editReply({
                     content: "❌ Uno de los jugadores no tiene suficientes monedas para continuar con la apuesta."
@@ -699,14 +709,18 @@ module.exports = {
                 .setColor(isEven ? 'LuminousVividPink' : 'DarkVividPink')
                 .setTimestamp();
 
+            // Editar el mensaje original (público)
             await interaction.message.edit({ embeds: [resultEmbed], components: [] });
+            
+            // Responder a la interacción del botón (privado)
             await interaction.editReply({ content: '✅ La apuesta ha sido procesada.' });
+
         } catch (error) {
             console.error("Error en handleButtonInteraction:", error);
             await interaction.editReply({
                 content: "❌ Ha ocurrido un error interno al procesar el botón. Por favor, inténtalo de nuevo más tarde.",
-                ephemeral: true
-            }).catch(e => console.error("No se pudo enviar la respuesta de error:", e));
+                flags: MessageFlags.Ephemeral
+            }).catch(e => console.error("No se pudo enviar la respuesta de error (después de deferral):", e));
         }
     }
 };
