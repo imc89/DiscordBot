@@ -1,19 +1,16 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events } = require("discord.js");
-const { MongoClient } = require("mongodb");
+// Importa la función para obtener la colección ya conectada (ajusta la ruta si es necesario)
+const { getMoneyCollection } = require('../index.js');
 
 // Define los IDs de los usuarios que pueden usar el comando de gestión
 const allowedUsers = ['852486349520371744', '1056942076480204801'];
-
-// Configura tu cadena de conexión a MongoDB
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_USER}.patcutg.mongodb.net/?retryWrites=true&w=majority&appName=${process.env.DB_USER}`;
-const client = new MongoClient(uri);
 
 // Array con mensajes y recompensas para el comando de trabajo
 const jobRewards = [
     // --- Ganancias significativas (Raras, +250 a +400) ---
     { message: "¡Éxito! Has completado un trabajo de **alto riesgo** para un cliente secreto. Ganancia espectacular de **{amount}**$.", amount: 4000 },
     { message: "Mientras buscabas, encontraste una **caja fuerte abandonada** con **{amount}**$.", amount: 2500 },
-    
+
     // --- Ganancias normales (Comunes, +75 a +150) ---
     { message: "Has entregado varios pedidos y recibido tu **paga semanal de {amount}**$.", amount: 1500 },
     { message: "Terminaste tu turno. Es un **día lento**, pero ganas **{amount}**$.", amount: 750 },
@@ -146,14 +143,12 @@ module.exports = {
 
 
     async execute(interaction) {
-        // Deferir la respuesta primero para evitar el timeout inicial
+        // Deferir la respuesta primero.
         await interaction.deferReply({ ephemeral: false });
 
         try {
-            // **[CORRECCIÓN CLAVE]** Conexión a la base de datos dentro del try
-            await client.connect();
-            const db = client.db("discord_bot");
-            const collection = db.collection("money");
+            // **[CORRECCIÓN CLAVE]** Obtener la colección ya conectada
+            const collection = getMoneyCollection();
 
             const subcommandGroup = interaction.options.getSubcommandGroup();
             const subcommand = interaction.options.getSubcommand();
@@ -597,17 +592,16 @@ module.exports = {
                 await interaction.editReply({ embeds: [embed] });
             }
         } catch (error) {
-            // **[CORRECCIÓN CLAVE]** Bloque Catch: Maneja cualquier error de DB/lógica
+            // Maneja cualquier error de DB/lógica
             console.error("Error en el comando law_money:", error);
             // Edita la respuesta para que el usuario no vea "La aplicación no ha respondido"
             await interaction.editReply({
                 content: "❌ Ha ocurrido un error interno. Inténtalo de nuevo más tarde o contacta a un administrador.",
                 ephemeral: true
             }).catch(e => console.error("No se pudo enviar la respuesta de error:", e));
-        } finally {
-            // **[CORRECCIÓN CLAVE]** Bloque Finally: Asegura que la conexión se cierre
-            await client.close();
         }
+        // Nota: La conexión se cierra en el archivo de inicio si usas el patrón de Paso 1.
+        // Si no usas el patrón de Paso 1, aún necesitas envolver todo en try...catch...finally.
     },
 
     async handleButtonInteraction(interaction) {
@@ -639,10 +633,8 @@ module.exports = {
         }
 
         try {
-            // **[CORRECCIÓN CLAVE]** Conexión dentro del try
-            await client.connect();
-            const db = client.db("discord_bot");
-            const collection = db.collection("money");
+            // **[CORRECCIÓN CLAVE]** Obtener la colección ya conectada
+            const collection = getMoneyCollection();
 
             const challengerData = await collection.findOne({ userId: challengerId });
             const opponentData = await collection.findOne({ userId: opponentId });
@@ -717,9 +709,6 @@ module.exports = {
                 content: "❌ Ha ocurrido un error interno al procesar el botón. Por favor, inténtalo de nuevo más tarde.",
                 ephemeral: true
             }).catch(e => console.error("No se pudo enviar la respuesta de error:", e));
-        } finally {
-            // **[CORRECCIÓN CLAVE]** Asegura que la conexión se cierre
-            await client.close();
         }
     }
 };
