@@ -146,453 +146,467 @@ module.exports = {
 
 
     async execute(interaction) {
-        // Deferir la respuesta para evitar el timeout de 3 segundos, lo cual es vital.
+        // Deferir la respuesta primero para evitar el timeout inicial
         await interaction.deferReply({ ephemeral: false });
 
-        await client.connect();
-        const db = client.db("discord_bot");
-        const collection = db.collection("money");
+        try {
+            // **[CORRECCIÓN CLAVE]** Conexión a la base de datos dentro del try
+            await client.connect();
+            const db = client.db("discord_bot");
+            const collection = db.collection("money");
 
-        const subcommandGroup = interaction.options.getSubcommandGroup();
-        const subcommand = interaction.options.getSubcommand();
-        const userId = interaction.user.id;
+            const subcommandGroup = interaction.options.getSubcommandGroup();
+            const subcommand = interaction.options.getSubcommand();
+            const userId = interaction.user.id;
 
-        let userData = await collection.findOne({ userId });
+            let userData = await collection.findOne({ userId });
 
-        // Si el usuario no existe, se crea un nuevo documento
-        if (!userData) {
-            userData = {
-                userId,
-                username: interaction.user.username,
-                displayName: interaction.user.displayName,
-                balance: 0,
-                last_daily: null,
-                last_job: null
-            };
-            await collection.insertOne(userData);
-        }
-
-        if (subcommand === 'daily') {
-            const lastDaily = userData.last_daily;
-            const now = new Date();
-            const oneDayInMs = 24 * 60 * 60 * 1000;
-
-            if (lastDaily && (now.getTime() - new Date(lastDaily).getTime()) < oneDayInMs) {
-                const timeLeft = oneDayInMs - (now.getTime() - new Date(lastDaily).getTime());
-                const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
-                const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-
-                return await interaction.editReply({
-                    content: `⏰ Ya has reclamado tu recompensa diaria. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
-                    ephemeral: true
-                });
-            }
-
-            const dailyReward = 200;
-            const newBalance = userData.balance + dailyReward;
-            await collection.updateOne(
-                { userId },
-                { $set: { balance: newBalance, last_daily: now.toISOString() } }
-            );
-
-            const embed = new EmbedBuilder()
-                .setTitle("🎁 Recompensa Diaria")
-                .setDescription(`Has reclamado tu recompensa de **${dailyReward}** monedas. Tu nuevo balance es de **${newBalance}** monedas.`)
-                .setColor("Gold")
-                .setTimestamp();
-
-            await interaction.editReply({ embeds: [embed] });
-
-        } else if (subcommand === 'job') {
-            const lastJob = userData.last_job;
-            const now = new Date();
-            const jobCooldownInMs = 2 * 60 * 60 * 1000;
-
-            if (lastJob && (now.getTime() - new Date(lastJob).getTime()) < jobCooldownInMs) {
-                const timeLeft = jobCooldownInMs - (now.getTime() - new Date(lastJob).getTime());
-                const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
-                const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-
-                return await interaction.editReply({
-                    content: `⏰ Ya has completado un trabajo recientemente. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
-                    ephemeral: true
-                });
-            }
-
-            const randomReward = jobRewards[Math.floor(Math.random() * jobRewards.length)];
-            const jobReward = randomReward.amount;
-            const newBalance = userData.balance + jobReward;
-            await collection.updateOne(
-                { userId },
-                { $set: { balance: newBalance, last_job: now.toISOString() } }
-            );
-
-            const embed = new EmbedBuilder()
-                .setTitle("💼 Resultado del Trabajo")
-                .setDescription(randomReward.message.replace('{amount}', Math.abs(jobReward)))
-                .addFields({
-                    name: 'Balance Actual',
-                    value: `Tu nuevo balance es de **${newBalance}** monedas.`,
-                })
-                .setColor(jobReward >= 0 ? "Orange" : "Red")
-                .setTimestamp();
-
-            await interaction.editReply({ embeds: [embed] });
-
-        } else if (subcommand === 'balance') {
-            const user = interaction.options.getUser("usuario") || interaction.user;
-            const targetId = user.id;
-
-            let targetData = await collection.findOne({ userId: targetId });
-
-            let balance = targetData ? targetData.balance : 0;
-            let usernameToDisplay = targetData ? targetData.displayName : user.displayName;
-
-            const embed = new EmbedBuilder()
-                .setTitle("💰 Balance de Monedas")
-                .setDescription(`El balance de **${usernameToDisplay}** es de **${balance}** monedas.`)
-                .setColor("Green")
-                .setTimestamp();
-
-            await interaction.editReply({ embeds: [embed] });
-
-        } else if (subcommand === 'transfer') {
-            const recipientUser = interaction.options.getUser("usuario");
-            const amount = interaction.options.getInteger("cantidad");
-
-            if (userId === recipientUser.id) {
-                return await interaction.editReply({
-                    content: "❌ No puedes transferir dinero a ti mismo.",
-                    ephemeral: true
-                });
-            }
-
-            if (userData.balance < amount) {
-                return await interaction.editReply({
-                    content: `❌ No tienes suficientes monedas para transferir **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
-                    ephemeral: true
-                });
-            }
-
-            let recipientData = await collection.findOne({ userId: recipientUser.id });
-            if (!recipientData) {
-                recipientData = {
-                    userId: recipientUser.id,
-                    username: recipientUser.username,
-                    displayName: recipientUser.displayName,
+            // Si el usuario no existe, se crea un nuevo documento
+            if (!userData) {
+                userData = {
+                    userId,
+                    username: interaction.user.username,
+                    displayName: interaction.user.displayName,
                     balance: 0,
                     last_daily: null,
                     last_job: null
                 };
-                await collection.insertOne(recipientData);
+                await collection.insertOne(userData);
             }
 
-            const newSenderBalance = userData.balance - amount;
-            const newRecipientBalance = recipientData.balance + amount;
+            if (subcommand === 'daily') {
+                const lastDaily = userData.last_daily;
+                const now = new Date();
+                const oneDayInMs = 24 * 60 * 60 * 1000;
 
-            await collection.updateOne({ userId }, { $set: { balance: newSenderBalance } });
-            await collection.updateOne({ userId: recipientUser.id }, { $set: { balance: newRecipientBalance } });
+                if (lastDaily && (now.getTime() - new Date(lastDaily).getTime()) < oneDayInMs) {
+                    const timeLeft = oneDayInMs - (now.getTime() - new Date(lastDaily).getTime());
+                    const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
+                    const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
-            const embed = new EmbedBuilder()
-                .setTitle("💸 Transferencia Exitosa")
-                .setDescription(`Has transferido **${amount}** monedas a **${recipientUser.displayName}**.`)
-                .addFields(
-                    { name: 'Tu nuevo balance', value: `**${newSenderBalance}** monedas.`, inline: true },
-                    { name: 'Balance del receptor', value: `**${newRecipientBalance}** monedas.`, inline: true }
-                )
-                .setColor("Blue")
-                .setTimestamp();
-
-            await interaction.editReply({ embeds: [embed] });
-
-        } else if (subcommand === 'game') {
-            const recipientUser = interaction.options.getUser("usuario");
-            const number = interaction.options.getInteger("numero");
-            const amount = interaction.options.getInteger("cantidad");
-
-
-            if (userId === recipientUser.id) {
-                return await interaction.editReply({
-                    content: "❌ No puedes apostar contra ti mismo.",
-                    ephemeral: true
-                });
-            }
-
-            if (userData.balance < amount) {
-                return await interaction.editReply({
-                    content: `❌ No tienes suficientes monedas para apostar **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
-                    ephemeral: true
-                });
-            }
-
-            let recipientData = await collection.findOne({ userId: recipientUser.id });
-            if (!recipientData || recipientData.balance < amount) {
-                return await interaction.editReply({
-                    content: `❌ El usuario **${recipientUser.displayName}** no tiene suficientes monedas para aceptar la apuesta de **${amount}**.`,
-                    ephemeral: true
-                });
-            }
-
-            const row = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`game_par_${userId}_${recipientUser.id}_${amount}_${number}`)
-                        .setLabel('PAR')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId(`game_impar_${userId}_${recipientUser.id}_${amount}_${number}`)
-                        .setLabel('IMPAR')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId(`game_decline_${userId}_${recipientUser.id}`)
-                        .setLabel('Rechazar Apuesta')
-                        .setStyle(ButtonStyle.Danger),
-                );
-
-            const embed = new EmbedBuilder()
-                .setTitle("🎲 ¡Nueva Apuesta!")
-                .setDescription(`**${recipientUser.displayName}**, **${interaction.user.displayName}** te ha desafiado a una apuesta de **${amount}** monedas. Adivina si el número que ha escogido es PAR o IMPAR.`)
-                .addFields({
-                    name: 'Instrucciones',
-                    value: `Elige PAR si crees que el número es par, o IMPAR si crees que es impar.`,
-                })
-                .setColor("Purple")
-                .setTimestamp();
-
-            await interaction.editReply({
-                embeds: [embed],
-                components: [row]
-            });
-
-        } else if (subcommand === 'rank') {
-            const users = await collection.find({}).sort({ balance: -1 }).limit(10).toArray();
-
-            let description = '';
-            for (let i = 0; i < users.length; i++) {
-                const user = users[i];
-                const member = interaction.guild.members.cache.get(user.userId);
-                const rankNumber = i + 1;
-                let emoji = '';
-
-                if (rankNumber === 1) emoji = '🏅';
-                else if (rankNumber === 2) emoji = '🥈';
-                else if (rankNumber === 3) emoji = '🥉';
-                else emoji = `${rankNumber}.`;
-
-                const username = member ? member.displayName : user.displayName;
-                description += `${emoji} **${username}**: ${user.balance} monedas\n`;
-            }
-
-            const embed = new EmbedBuilder()
-                .setTitle("🏆 Ranking de Riqueza")
-                .setDescription(description || 'Aún no hay usuarios en el ranking.')
-                .setColor("Green")
-                .setTimestamp();
-
-            await interaction.editReply({ embeds: [embed] });
-
-        } else if (subcommandGroup === 'manage') {
-            if (!allowedUsers.includes(userId)) {
-                return await interaction.editReply({
-                    content: "❌ No tienes permiso para usar este comando de gestión.",
-                    ephemeral: true
-                });
-            }
-
-            if (subcommand === 'view') {
-                const allUsers = await collection.find({}).toArray();
-                const fileContent = JSON.stringify(allUsers, null, 2);
-
-                const embed = new EmbedBuilder()
-                    .setTitle("📁 Contenido de la Base de Datos")
-                    .setDescription(`\`\`\`json\n${fileContent}\n\`\`\``)
-                    .setColor("Blurple")
-                    .setTimestamp();
-
-                await interaction.editReply({ embeds: [embed] });
-
-            } else if (subcommand === 'edit') {
-                const userToEdit = interaction.options.getUser("usuario");
-                const newAmount = interaction.options.getInteger("cantidad");
-
-                await collection.updateOne(
-                    { userId: userToEdit.id },
-                    {
-                        $set: {
-                            balance: newAmount,
-                            username: userToEdit.username,
-                            displayName: userToEdit.displayName
-                        }
-                    },
-                    { upsert: true }
-                );
-
-                const embed = new EmbedBuilder()
-                    .setTitle("✏️ Balance Editado")
-                    .setDescription(`El balance de **${userToEdit.displayName}** ha sido actualizado a **${newAmount}** monedas.`)
-                    .setColor("DarkBlue")
-                    .setTimestamp();
-
-                await interaction.editReply({ embeds: [embed] });
-            }
-        } else if (subcommand === 'slot') {
-            const amount = interaction.options.getInteger("cantidad");
-
-            if (userData.balance < amount) {
-                return await interaction.editReply({
-                    content: `❌ No tienes suficientes monedas para apostar **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
-                    ephemeral: true
-                });
-            }
-
-            const emojis = ['🍒', '🍋', '🔔', '💎', '🍀'];
-            const reel = [
-                emojis[Math.floor(Math.random() * emojis.length)],
-                emojis[Math.floor(Math.random() * emojis.length)],
-                emojis[Math.floor(Math.random() * emojis.length)]
-            ];
-            const reelString = reel.join(' | ');
-
-            let resultMessage;
-            let winAmount = 0;
-            let color = "Red";
-
-            if (reel[0] === reel[1] && reel[1] === reel[2]) {
-                if (reel[0] === '💎') {
-                    winAmount = amount * 10;
-                    resultMessage = `🎉 ¡JACKPOT! Has ganado **${winAmount}** monedas.`;
-                    color = "Gold";
-                } else {
-                    winAmount = amount * 4;
-                    resultMessage = `🎉 ¡Has sacado triple! Has ganado **${winAmount}** monedas.`;
-                    color = "Green";
+                    return await interaction.editReply({
+                        content: `⏰ Ya has reclamado tu recompensa diaria. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
+                        ephemeral: true
+                    });
                 }
-            } else if (reel[0] === reel[1] || reel[1] === reel[2] || reel[0] === reel[2]) {
-                winAmount = amount * 2;
-                resultMessage = `🥳 ¡Has sacado doble! Has ganado **${winAmount}** monedas.`;
-                color = "Blue";
-            } else {
-                winAmount = -amount;
-                resultMessage = `😔 Has perdido **${amount}** monedas.`;
-            }
 
-            const newBalance = userData.balance + winAmount;
-            await collection.updateOne(
-                { userId },
-                { $set: { balance: newBalance } }
-            );
+                const dailyReward = 200;
+                const newBalance = userData.balance + dailyReward;
+                await collection.updateOne(
+                    { userId },
+                    { $set: { balance: newBalance, last_daily: now.toISOString() } }
+                );
 
-            const embed = new EmbedBuilder()
-                .setTitle("🎰 Tragamonedas")
-                .setDescription(resultMessage)
-                .addFields(
-                    { name: 'Resultado del carrete', value: `\`${reelString}\`` },
-                    { name: 'Balance Actual', value: `Tu nuevo balance es de **${newBalance}** monedas.` }
-                )
-                .setColor(color)
-                .setTimestamp();
+                const embed = new EmbedBuilder()
+                    .setTitle("🎁 Recompensa Diaria")
+                    .setDescription(`Has reclamado tu recompensa de **${dailyReward}** monedas. Tu nuevo balance es de **${newBalance}** monedas.`)
+                    .setColor("Gold")
+                    .setTimestamp();
 
-            await interaction.editReply({ embeds: [embed] });
-        } else if (subcommand === 'rob') {
-            const targetUser = interaction.options.getUser("usuario");
-            const targetId = targetUser.id;
+                await interaction.editReply({ embeds: [embed] });
 
-            if (userId === targetId) {
-                return await interaction.editReply({
-                    content: "❌ No puedes robarte a ti mismo.",
-                    ephemeral: true
-                });
-            }
+            } else if (subcommand === 'job') {
+                const lastJob = userData.last_job;
+                const now = new Date();
+                const jobCooldownInMs = 2 * 60 * 60 * 1000;
 
-            let targetData = await collection.findOne({ userId: targetId });
+                if (lastJob && (now.getTime() - new Date(lastJob).getTime()) < jobCooldownInMs) {
+                    const timeLeft = jobCooldownInMs - (now.getTime() - new Date(lastJob).getTime());
+                    const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
+                    const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
-            if (!targetData || targetData.balance < 100) {
-                return await interaction.editReply({
-                    content: `❌ El usuario **${targetUser.displayName}** no tiene suficientes monedas para ser robado (necesita al menos 100 monedas).`,
-                    ephemeral: true
-                });
-            }
+                    return await interaction.editReply({
+                        content: `⏰ Ya has completado un trabajo recientemente. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
+                        ephemeral: true
+                    });
+                }
 
-            const robSuccess = Math.random() < 0.4; // 40% de probabilidad de éxito
-            let robAmount;
-            let newRobberBalance;
-            let newTargetBalance;
-            let embed;
+                const randomReward = jobRewards[Math.floor(Math.random() * jobRewards.length)];
+                const jobReward = randomReward.amount;
+                const newBalance = userData.balance + jobReward;
+                await collection.updateOne(
+                    { userId },
+                    { $set: { balance: newBalance, last_job: now.toISOString() } }
+                );
 
-            // Rango de porcentaje a robar de la víctima: 10% a 20%
-            const MIN_ROB_PERCENT = 0.10;
-            const MAX_ROB_PERCENT = 0.20;
+                const embed = new EmbedBuilder()
+                    .setTitle("💼 Resultado del Trabajo")
+                    .setDescription(randomReward.message.replace('{amount}', Math.abs(jobReward)))
+                    .addFields({
+                        name: 'Balance Actual',
+                        value: `Tu nuevo balance es de **${newBalance}** monedas.`,
+                    })
+                    .setColor(jobReward >= 0 ? "Orange" : "Red")
+                    .setTimestamp();
 
-            // Rango de porcentaje de penalización del ladrón: 15% a 30%
-            const MIN_PENALTY_PERCENT = 0.15;
-            const MAX_PENALTY_PERCENT = 0.30;
-            // Penalización mínima garantizada (para que los balances bajos sigan sintiendo el castigo)
-            const MIN_FLAT_PENALTY = 100;
+                await interaction.editReply({ embeds: [embed] });
 
+            } else if (subcommand === 'balance') {
+                const user = interaction.options.getUser("usuario") || interaction.user;
+                const targetId = user.id;
 
-            if (robSuccess) {
-                // 1. Calcula el porcentaje aleatorio a robar (entre 10% y 20%)
-                const robPercentage = Math.random() * (MAX_ROB_PERCENT - MIN_ROB_PERCENT) + MIN_ROB_PERCENT;
+                let targetData = await collection.findOne({ userId: targetId });
 
-                // 2. Calcula la cantidad real basada en el balance de la VÍCTIMA
-                let robAmount = Math.floor(targetData.balance * robPercentage);
+                let balance = targetData ? targetData.balance : 0;
+                let usernameToDisplay = targetData ? targetData.displayName : user.displayName;
 
-                // Aseguramos que la cantidad robada no sea cero si el porcentaje es pequeño
-                if (robAmount < 1) robAmount = 1;
-
-                newRobberBalance = userData.balance + robAmount;
-                newTargetBalance = targetData.balance - robAmount;
-
-                // Si la víctima queda con balance negativo (teóricamente no debería pasar si tiene más de 100)
-                if (newTargetBalance < 0) newTargetBalance = 0;
-
-                await collection.updateOne({ userId }, { $set: { balance: newRobberBalance } });
-                await collection.updateOne({ userId: targetId }, { $set: { balance: newTargetBalance } });
-
-                embed = new EmbedBuilder()
-                    .setTitle("🔪 Robo Exitoso")
-                    .setDescription(`¡Has logrado robarle **${robAmount}** monedas a **${targetUser.displayName}**!`)
-                    .addFields(
-                        { name: `Tu nuevo balance`, value: `**${newRobberBalance}** monedas`, inline: true },
-                        { name: `Balance de ${targetUser.displayName}`, value: `**${newTargetBalance}** monedas`, inline: true }
-                    )
+                const embed = new EmbedBuilder()
+                    .setTitle("💰 Balance de Monedas")
+                    .setDescription(`El balance de **${usernameToDisplay}** es de **${balance}** monedas.`)
                     .setColor("Green")
                     .setTimestamp();
-            } else {
-                // 1. Calcula el porcentaje aleatorio de penalización (entre 15% y 30%)
-                const penaltyPercentage = Math.random() * (MAX_PENALTY_PERCENT - MIN_PENALTY_PERCENT) + MIN_PENALTY_PERCENT;
 
-                // 2. Calcula la cantidad real basada en el balance del LADRÓN
-                let penaltyAmount = Math.floor(userData.balance * penaltyPercentage);
+                await interaction.editReply({ embeds: [embed] });
 
-                // 3. Aplica una penalización mínima si la cantidad calculada es demasiado baja
-                if (penaltyAmount < MIN_FLAT_PENALTY) {
-                    penaltyAmount = MIN_FLAT_PENALTY;
+            } else if (subcommand === 'transfer') {
+                const recipientUser = interaction.options.getUser("usuario");
+                const amount = interaction.options.getInteger("cantidad");
+
+                if (userId === recipientUser.id) {
+                    return await interaction.editReply({
+                        content: "❌ No puedes transferir dinero a ti mismo.",
+                        ephemeral: true
+                    });
                 }
 
-                newRobberBalance = userData.balance - penaltyAmount;
-
-                // Evita que el balance del ladrón sea negativo
-                if (newRobberBalance < 0) {
-                    // La penalización real es solo lo que le quedaba al usuario
-                    penaltyAmount = userData.balance;
-                    newRobberBalance = 0;
+                if (userData.balance < amount) {
+                    return await interaction.editReply({
+                        content: `❌ No tienes suficientes monedas para transferir **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
+                        ephemeral: true
+                    });
                 }
 
-                await collection.updateOne({ userId }, { $set: { balance: newRobberBalance } });
+                let recipientData = await collection.findOne({ userId: recipientUser.id });
+                if (!recipientData) {
+                    recipientData = {
+                        userId: recipientUser.id,
+                        username: recipientUser.username,
+                        displayName: recipientUser.displayName,
+                        balance: 0,
+                        last_daily: null,
+                        last_job: null
+                    };
+                    await collection.insertOne(recipientData);
+                }
 
-                embed = new EmbedBuilder()
-                    .setTitle("🚔 Robo Fallido")
-                    .setDescription(`¡Fuiste atrapado intentando robarle a **${targetUser.displayName}** y tuviste que pagar una multa de **${penaltyAmount}** monedas!`)
-                    .addFields({
-                        name: `Tu nuevo balance`,
-                        value: `**${newRobberBalance}** monedas`,
-                    })
-                    .setColor("Red")
+                const newSenderBalance = userData.balance - amount;
+                const newRecipientBalance = recipientData.balance + amount;
+
+                await collection.updateOne({ userId }, { $set: { balance: newSenderBalance } });
+                await collection.updateOne({ userId: recipientUser.id }, { $set: { balance: newRecipientBalance } });
+
+                const embed = new EmbedBuilder()
+                    .setTitle("💸 Transferencia Exitosa")
+                    .setDescription(`Has transferido **${amount}** monedas a **${recipientUser.displayName}**.`)
+                    .addFields(
+                        { name: 'Tu nuevo balance', value: `**${newSenderBalance}** monedas.`, inline: true },
+                        { name: 'Balance del receptor', value: `**${newRecipientBalance}** monedas.`, inline: true }
+                    )
+                    .setColor("Blue")
                     .setTimestamp();
-            }
 
-            await interaction.editReply({ embeds: [embed] });
+                await interaction.editReply({ embeds: [embed] });
+
+            } else if (subcommand === 'game') {
+                const recipientUser = interaction.options.getUser("usuario");
+                const number = interaction.options.getInteger("numero");
+                const amount = interaction.options.getInteger("cantidad");
+
+
+                if (userId === recipientUser.id) {
+                    return await interaction.editReply({
+                        content: "❌ No puedes apostar contra ti mismo.",
+                        ephemeral: true
+                    });
+                }
+
+                if (userData.balance < amount) {
+                    return await interaction.editReply({
+                        content: `❌ No tienes suficientes monedas para apostar **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
+                        ephemeral: true
+                    });
+                }
+
+                let recipientData = await collection.findOne({ userId: recipientUser.id });
+                if (!recipientData || recipientData.balance < amount) {
+                    return await interaction.editReply({
+                        content: `❌ El usuario **${recipientUser.displayName}** no tiene suficientes monedas para aceptar la apuesta de **${amount}**.`,
+                        ephemeral: true
+                    });
+                }
+
+                const row = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`game_par_${userId}_${recipientUser.id}_${amount}_${number}`)
+                            .setLabel('PAR')
+                            .setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder()
+                            .setCustomId(`game_impar_${userId}_${recipientUser.id}_${amount}_${number}`)
+                            .setLabel('IMPAR')
+                            .setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder()
+                            .setCustomId(`game_decline_${userId}_${recipientUser.id}`)
+                            .setLabel('Rechazar Apuesta')
+                            .setStyle(ButtonStyle.Danger),
+                    );
+
+                const embed = new EmbedBuilder()
+                    .setTitle("🎲 ¡Nueva Apuesta!")
+                    .setDescription(`**${recipientUser.displayName}**, **${interaction.user.displayName}** te ha desafiado a una apuesta de **${amount}** monedas. Adivina si el número que ha escogido es PAR o IMPAR.`)
+                    .addFields({
+                        name: 'Instrucciones',
+                        value: `Elige PAR si crees que el número es par, o IMPAR si crees que es impar.`,
+                    })
+                    .setColor("Purple")
+                    .setTimestamp();
+
+                await interaction.editReply({
+                    embeds: [embed],
+                    components: [row]
+                });
+
+            } else if (subcommand === 'rank') {
+                const users = await collection.find({}).sort({ balance: -1 }).limit(10).toArray();
+
+                let description = '';
+                for (let i = 0; i < users.length; i++) {
+                    const user = users[i];
+                    const member = interaction.guild.members.cache.get(user.userId);
+                    const rankNumber = i + 1;
+                    let emoji = '';
+
+                    if (rankNumber === 1) emoji = '🏅';
+                    else if (rankNumber === 2) emoji = '🥈';
+                    else if (rankNumber === 3) emoji = '🥉';
+                    else emoji = `${rankNumber}.`;
+
+                    const username = member ? member.displayName : user.displayName;
+                    description += `${emoji} **${username}**: ${user.balance} monedas\n`;
+                }
+
+                const embed = new EmbedBuilder()
+                    .setTitle("🏆 Ranking de Riqueza")
+                    .setDescription(description || 'Aún no hay usuarios en el ranking.')
+                    .setColor("Green")
+                    .setTimestamp();
+
+                await interaction.editReply({ embeds: [embed] });
+
+            } else if (subcommandGroup === 'manage') {
+                if (!allowedUsers.includes(userId)) {
+                    return await interaction.editReply({
+                        content: "❌ No tienes permiso para usar este comando de gestión.",
+                        ephemeral: true
+                    });
+                }
+
+                if (subcommand === 'view') {
+                    const allUsers = await collection.find({}).toArray();
+                    const fileContent = JSON.stringify(allUsers, null, 2);
+
+                    const embed = new EmbedBuilder()
+                        .setTitle("📁 Contenido de la Base de Datos")
+                        .setDescription(`\`\`\`json\n${fileContent}\n\`\`\``)
+                        .setColor("Blurple")
+                        .setTimestamp();
+
+                    await interaction.editReply({ embeds: [embed] });
+
+                } else if (subcommand === 'edit') {
+                    const userToEdit = interaction.options.getUser("usuario");
+                    const newAmount = interaction.options.getInteger("cantidad");
+
+                    await collection.updateOne(
+                        { userId: userToEdit.id },
+                        {
+                            $set: {
+                                balance: newAmount,
+                                username: userToEdit.username,
+                                displayName: userToEdit.displayName
+                            }
+                        },
+                        { upsert: true }
+                    );
+
+                    const embed = new EmbedBuilder()
+                        .setTitle("✏️ Balance Editado")
+                        .setDescription(`El balance de **${userToEdit.displayName}** ha sido actualizado a **${newAmount}** monedas.`)
+                        .setColor("DarkBlue")
+                        .setTimestamp();
+
+                    await interaction.editReply({ embeds: [embed] });
+                }
+            } else if (subcommand === 'slot') {
+                const amount = interaction.options.getInteger("cantidad");
+
+                if (userData.balance < amount) {
+                    return await interaction.editReply({
+                        content: `❌ No tienes suficientes monedas para apostar **${amount}**. Tu balance actual es de **${userData.balance}** monedas.`,
+                        ephemeral: true
+                    });
+                }
+
+                const emojis = ['🍒', '🍋', '🔔', '💎', '🍀'];
+                const reel = [
+                    emojis[Math.floor(Math.random() * emojis.length)],
+                    emojis[Math.floor(Math.random() * emojis.length)],
+                    emojis[Math.floor(Math.random() * emojis.length)]
+                ];
+                const reelString = reel.join(' | ');
+
+                let resultMessage;
+                let winAmount = 0;
+                let color = "Red";
+
+                if (reel[0] === reel[1] && reel[1] === reel[2]) {
+                    if (reel[0] === '💎') {
+                        winAmount = amount * 10;
+                        resultMessage = `🎉 ¡JACKPOT! Has ganado **${winAmount}** monedas.`;
+                        color = "Gold";
+                    } else {
+                        winAmount = amount * 4;
+                        resultMessage = `🎉 ¡Has sacado triple! Has ganado **${winAmount}** monedas.`;
+                        color = "Green";
+                    }
+                } else if (reel[0] === reel[1] || reel[1] === reel[2] || reel[0] === reel[2]) {
+                    winAmount = amount * 2;
+                    resultMessage = `🥳 ¡Has sacado doble! Has ganado **${winAmount}** monedas.`;
+                    color = "Blue";
+                } else {
+                    winAmount = -amount;
+                    resultMessage = `😔 Has perdido **${amount}** monedas.`;
+                }
+
+                const newBalance = userData.balance + winAmount;
+                await collection.updateOne(
+                    { userId },
+                    { $set: { balance: newBalance } }
+                );
+
+                const embed = new EmbedBuilder()
+                    .setTitle("🎰 Tragamonedas")
+                    .setDescription(resultMessage)
+                    .addFields(
+                        { name: 'Resultado del carrete', value: `\`${reelString}\`` },
+                        { name: 'Balance Actual', value: `Tu nuevo balance es de **${newBalance}** monedas.` }
+                    )
+                    .setColor(color)
+                    .setTimestamp();
+
+                await interaction.editReply({ embeds: [embed] });
+            } else if (subcommand === 'rob') {
+                const targetUser = interaction.options.getUser("usuario");
+                const targetId = targetUser.id;
+
+                if (userId === targetId) {
+                    return await interaction.editReply({
+                        content: "❌ No puedes robarte a ti mismo.",
+                        ephemeral: true
+                    });
+                }
+
+                let targetData = await collection.findOne({ userId: targetId });
+
+                if (!targetData || targetData.balance < 100) {
+                    return await interaction.editReply({
+                        content: `❌ El usuario **${targetUser.displayName}** no tiene suficientes monedas para ser robado (necesita al menos 100 monedas).`,
+                        ephemeral: true
+                    });
+                }
+
+                const robSuccess = Math.random() < 0.4; // 40% de probabilidad de éxito
+                let robAmount;
+                let newRobberBalance;
+                let newTargetBalance;
+                let embed;
+
+                // Rango de porcentaje a robar de la víctima: 10% a 20%
+                const MIN_ROB_PERCENT = 0.10;
+                const MAX_ROB_PERCENT = 0.20;
+
+                // Rango de porcentaje de penalización del ladrón: 15% a 30%
+                const MIN_PENALTY_PERCENT = 0.15;
+                const MAX_PENALTY_PERCENT = 0.30;
+                // Penalización mínima garantizada (para que los balances bajos sigan sintiendo el castigo)
+                const MIN_FLAT_PENALTY = 100;
+
+
+                if (robSuccess) {
+                    // 1. Calcula el porcentaje aleatorio a robar (entre 10% y 20%)
+                    const robPercentage = Math.random() * (MAX_ROB_PERCENT - MIN_ROB_PERCENT) + MIN_ROB_PERCENT;
+
+                    // 2. Calcula la cantidad real basada en el balance de la VÍCTIMA
+                    let robAmount = Math.floor(targetData.balance * robPercentage);
+
+                    // Aseguramos que la cantidad robada no sea cero si el porcentaje es pequeño
+                    if (robAmount < 1) robAmount = 1;
+
+                    newRobberBalance = userData.balance + robAmount;
+                    newTargetBalance = targetData.balance - robAmount;
+
+                    // Si la víctima queda con balance negativo (teóricamente no debería pasar si tiene más de 100)
+                    if (newTargetBalance < 0) newTargetBalance = 0;
+
+                    await collection.updateOne({ userId }, { $set: { balance: newRobberBalance } });
+                    await collection.updateOne({ userId: targetId }, { $set: { balance: newTargetBalance } });
+
+                    embed = new EmbedBuilder()
+                        .setTitle("🔪 Robo Exitoso")
+                        .setDescription(`¡Has logrado robarle **${robAmount}** monedas a **${targetUser.displayName}**!`)
+                        .addFields(
+                            { name: `Tu nuevo balance`, value: `**${newRobberBalance}** monedas`, inline: true },
+                            { name: `Balance de ${targetUser.displayName}`, value: `**${newTargetBalance}** monedas`, inline: true }
+                        )
+                        .setColor("Green")
+                        .setTimestamp();
+                } else {
+                    // 1. Calcula el porcentaje aleatorio de penalización (entre 15% y 30%)
+                    const penaltyPercentage = Math.random() * (MAX_PENALTY_PERCENT - MIN_PENALTY_PERCENT) + MIN_PENALTY_PERCENT;
+
+                    // 2. Calcula la cantidad real basada en el balance del LADRÓN
+                    let penaltyAmount = Math.floor(userData.balance * penaltyPercentage);
+
+                    // 3. Aplica una penalización mínima si la cantidad calculada es demasiado baja
+                    if (penaltyAmount < MIN_FLAT_PENALTY) {
+                        penaltyAmount = MIN_FLAT_PENALTY;
+                    }
+
+                    newRobberBalance = userData.balance - penaltyAmount;
+
+                    // Evita que el balance del ladrón sea negativo
+                    if (newRobberBalance < 0) {
+                        // La penalización real es solo lo que le quedaba al usuario
+                        penaltyAmount = userData.balance;
+                        newRobberBalance = 0;
+                    }
+
+                    await collection.updateOne({ userId }, { $set: { balance: newRobberBalance } });
+
+                    embed = new EmbedBuilder()
+                        .setTitle("🚔 Robo Fallido")
+                        .setDescription(`¡Fuiste atrapado intentando robarle a **${targetUser.displayName}** y tuviste que pagar una multa de **${penaltyAmount}** monedas!`)
+                        .addFields({
+                            name: `Tu nuevo balance`,
+                            value: `**${newRobberBalance}** monedas`,
+                        })
+                        .setColor("Red")
+                        .setTimestamp();
+                }
+
+                await interaction.editReply({ embeds: [embed] });
+            }
+        } catch (error) {
+            // **[CORRECCIÓN CLAVE]** Bloque Catch: Maneja cualquier error de DB/lógica
+            console.error("Error en el comando law_money:", error);
+            // Edita la respuesta para que el usuario no vea "La aplicación no ha respondido"
+            await interaction.editReply({
+                content: "❌ Ha ocurrido un error interno. Inténtalo de nuevo más tarde o contacta a un administrador.",
+                ephemeral: true
+            }).catch(e => console.error("No se pudo enviar la respuesta de error:", e));
+        } finally {
+            // **[CORRECCIÓN CLAVE]** Bloque Finally: Asegura que la conexión se cierre
+            await client.close();
         }
     },
 
@@ -602,7 +616,6 @@ module.exports = {
         await interaction.deferReply({ ephemeral: true });
 
         // Descomponer el customId.
-        // El orden es: [ prefijo, tipo de apuesta, ID del retador, ID del oponente, cantidad, numero ]
         const parts = interaction.customId.split('_');
 
         // Validar el formato del customId
@@ -625,76 +638,88 @@ module.exports = {
             });
         }
 
-        await client.connect();
-        const db = client.db("discord_bot");
-        const collection = db.collection("money");
+        try {
+            // **[CORRECCIÓN CLAVE]** Conexión dentro del try
+            await client.connect();
+            const db = client.db("discord_bot");
+            const collection = db.collection("money");
 
-        const challengerData = await collection.findOne({ userId: challengerId });
-        const opponentData = await collection.findOne({ userId: opponentId });
+            const challengerData = await collection.findOne({ userId: challengerId });
+            const opponentData = await collection.findOne({ userId: opponentId });
 
-        // Validar fondos y usuarios
-        if (!challengerData || challengerData.balance < amount || !opponentData || opponentData.balance < amount) {
-            await interaction.message.edit({ components: [] });
-            return await interaction.editReply({
-                content: "❌ Uno de los jugadores no tiene suficientes monedas para continuar con la apuesta."
-            });
+            // Validar fondos y usuarios
+            if (!challengerData || challengerData.balance < amount || !opponentData || opponentData.balance < amount) {
+                await interaction.message.edit({ components: [] });
+                return await interaction.editReply({
+                    content: "❌ Uno de los jugadores no tiene suficientes monedas para continuar con la apuesta."
+                });
+            }
+
+            // Lógica para el botón de rechazo
+            if (action === 'decline') {
+                const declineEmbed = new EmbedBuilder()
+                    .setTitle('❌ Apuesta Rechazada')
+                    .setDescription(`**${interaction.user.displayName}** ha rechazado la apuesta de **${amount}** monedas.`)
+                    .setColor('Red');
+
+                await interaction.message.edit({ embeds: [declineEmbed], components: [] });
+                return await interaction.editReply({ content: '✅ Has rechazado la apuesta.' });
+            }
+
+            // Lógica del juego
+            const isEven = number % 2 === 0;
+            const opponentGuessEven = action === 'par';
+
+            let resultMessage;
+            let winnerId;
+            let loserId;
+            let winnerUser;
+            let loserUser;
+
+            if ((isEven && opponentGuessEven) || (!isEven && !opponentGuessEven)) {
+                winnerId = opponentId;
+                loserId = challengerId;
+                winnerUser = interaction.user;
+                loserUser = await interaction.client.users.fetch(challengerId);
+                resultMessage = `🎉 ¡Victoria! **${winnerUser.displayName}** ha adivinado correctamente. El número era **${number}** y es ${isEven ? 'PAR' : 'IMPAR'}.`;
+            } else {
+                winnerId = challengerId;
+                loserId = opponentId;
+                winnerUser = await interaction.client.users.fetch(challengerId);
+                loserUser = interaction.user;
+                resultMessage = `❌ ¡Derrota! **${loserUser.displayName}** se ha equivocado. El número era **${number}** y es ${isEven ? 'PAR' : 'IMPAR'}.`;
+            }
+
+            // Actualizar balances
+            await collection.updateOne({ userId: winnerId }, { $inc: { balance: amount } });
+            await collection.updateOne({ userId: loserId }, { $inc: { balance: -amount } });
+
+            // Recuperar balances actualizados
+            const newWinnerData = await collection.findOne({ userId: winnerId });
+            const newLoserData = await collection.findOne({ userId: loserId });
+
+            // Crear y enviar embed del resultado
+            const resultEmbed = new EmbedBuilder()
+                .setTitle('🎲 Resultado de la Apuesta')
+                .setDescription(resultMessage)
+                .addFields(
+                    { name: `Balance de ${winnerUser.displayName}`, value: `**${newWinnerData.balance}** monedas`, inline: true },
+                    { name: `Balance de ${loserUser.displayName}`, value: `**${newLoserData.balance}** monedas`, inline: true }
+                )
+                .setColor(isEven ? 'LuminousVividPink' : 'DarkVividPink')
+                .setTimestamp();
+
+            await interaction.message.edit({ embeds: [resultEmbed], components: [] });
+            await interaction.editReply({ content: '✅ La apuesta ha sido procesada.' });
+        } catch (error) {
+            console.error("Error en handleButtonInteraction:", error);
+            await interaction.editReply({
+                content: "❌ Ha ocurrido un error interno al procesar el botón. Por favor, inténtalo de nuevo más tarde.",
+                ephemeral: true
+            }).catch(e => console.error("No se pudo enviar la respuesta de error:", e));
+        } finally {
+            // **[CORRECCIÓN CLAVE]** Asegura que la conexión se cierre
+            await client.close();
         }
-
-        // Lógica para el botón de rechazo
-        if (action === 'decline') {
-            const declineEmbed = new EmbedBuilder()
-                .setTitle('❌ Apuesta Rechazada')
-                .setDescription(`**${interaction.user.displayName}** ha rechazado la apuesta de **${amount}** monedas.`)
-                .setColor('Red');
-
-            await interaction.message.edit({ embeds: [declineEmbed], components: [] });
-            return await interaction.editReply({ content: '✅ Has rechazado la apuesta.' });
-        }
-
-        // Lógica del juego
-        const isEven = number % 2 === 0;
-        const opponentGuessEven = action === 'par';
-
-        let resultMessage;
-        let winnerId;
-        let loserId;
-        let winnerUser;
-        let loserUser;
-
-        if ((isEven && opponentGuessEven) || (!isEven && !opponentGuessEven)) {
-            winnerId = opponentId;
-            loserId = challengerId;
-            winnerUser = interaction.user;
-            loserUser = await interaction.client.users.fetch(challengerId);
-            resultMessage = `🎉 ¡Victoria! **${winnerUser.displayName}** ha adivinado correctamente. El número era **${number}** y es ${isEven ? 'PAR' : 'IMPAR'}.`;
-        } else {
-            winnerId = challengerId;
-            loserId = opponentId;
-            winnerUser = await interaction.client.users.fetch(challengerId);
-            loserUser = interaction.user;
-            resultMessage = `❌ ¡Derrota! **${loserUser.displayName}** se ha equivocado. El número era **${number}** y es ${isEven ? 'PAR' : 'IMPAR'}.`;
-        }
-
-        // Actualizar balances
-        await collection.updateOne({ userId: winnerId }, { $inc: { balance: amount } });
-        await collection.updateOne({ userId: loserId }, { $inc: { balance: -amount } });
-
-        // Recuperar balances actualizados
-        const newWinnerData = await collection.findOne({ userId: winnerId });
-        const newLoserData = await collection.findOne({ userId: loserId });
-
-        // Crear y enviar embed del resultado
-        const resultEmbed = new EmbedBuilder()
-            .setTitle('🎲 Resultado de la Apuesta')
-            .setDescription(resultMessage)
-            .addFields(
-                { name: `Balance de ${winnerUser.displayName}`, value: `**${newWinnerData.balance}** monedas`, inline: true },
-                { name: `Balance de ${loserUser.displayName}`, value: `**${newLoserData.balance}** monedas`, inline: true }
-            )
-            .setColor(isEven ? 'LuminousVividPink' : 'DarkVividPink')
-            .setTimestamp();
-
-        await interaction.message.edit({ embeds: [resultEmbed], components: [] });
-        await interaction.editReply({ content: '✅ La apuesta ha sido procesada.' });
     }
 };
