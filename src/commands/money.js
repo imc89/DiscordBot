@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events } = require("discord.js");
-// Importa la función para obtener la colección ya conectada (ajusta la ruta si es necesario)
-const { getMoneyCollection } = require('../index.js');
+// **[CORRECCIÓN DE RUTA]** Cambiado de '../index.js' a '../../index.js' (ajusta si es necesario)
+const { getMoneyCollection } = require('../../index.js'); 
 
 // Define los IDs de los usuarios que pueden usar el comando de gestión
 const allowedUsers = ['852486349520371744', '1056942076480204801'];
@@ -10,7 +10,7 @@ const jobRewards = [
     // --- Ganancias significativas (Raras, +250 a +400) ---
     { message: "¡Éxito! Has completado un trabajo de **alto riesgo** para un cliente secreto. Ganancia espectacular de **{amount}**$.", amount: 4000 },
     { message: "Mientras buscabas, encontraste una **caja fuerte abandonada** con **{amount}**$.", amount: 2500 },
-
+    
     // --- Ganancias normales (Comunes, +75 a +150) ---
     { message: "Has entregado varios pedidos y recibido tu **paga semanal de {amount}**$.", amount: 1500 },
     { message: "Terminaste tu turno. Es un **día lento**, pero ganas **{amount}**$.", amount: 750 },
@@ -147,7 +147,7 @@ module.exports = {
         await interaction.deferReply({ ephemeral: false });
 
         try {
-            // **[CORRECCIÓN CLAVE]** Obtener la colección ya conectada
+            // Obtener la colección ya conectada
             const collection = getMoneyCollection();
 
             const subcommandGroup = interaction.options.getSubcommandGroup();
@@ -600,8 +600,6 @@ module.exports = {
                 ephemeral: true
             }).catch(e => console.error("No se pudo enviar la respuesta de error:", e));
         }
-        // Nota: La conexión se cierra en el archivo de inicio si usas el patrón de Paso 1.
-        // Si no usas el patrón de Paso 1, aún necesitas envolver todo en try...catch...finally.
     },
 
     async handleButtonInteraction(interaction) {
@@ -633,7 +631,7 @@ module.exports = {
         }
 
         try {
-            // **[CORRECCIÓN CLAVE]** Obtener la colección ya conectada
+            // Obtener la colección ya conectada
             const collection = getMoneyCollection();
 
             const challengerData = await collection.findOne({ userId: challengerId });
