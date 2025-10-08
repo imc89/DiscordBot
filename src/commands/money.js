@@ -1,5 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require("discord.js");
 // **[RUTA CORREGIDA]** De acuerdo a tu estructura /src/commands/
+// !! ERROR FIX NOTE: Ensure that '../../index.js' exports 'getMoneyCollection' as a named FUNCTION.
+// Example: module.exports = { getMoneyCollection: getMoneyCollectionFunction };
 const { getMoneyCollection } = require('../../index.js'); 
 
 // Define los IDs de los usuarios que pueden usar el comando de gestión
@@ -149,7 +151,7 @@ module.exports = {
 
         try {
             // Obtener la colección ya conectada
-            const collection = getMoneyCollection();
+            const collection = getMoneyCollection(); // THIS LINE IS CAUSING THE ERROR IF NOT EXPORTED CORRECTLY
 
             const subcommandGroup = interaction.options.getSubcommandGroup();
             const subcommand = interaction.options.getSubcommand();
