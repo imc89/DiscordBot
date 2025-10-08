@@ -1,8 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require("discord.js");
-// **[RUTA CORREGIDA]** De acuerdo a tu estructura /src/commands/
-// !! ERROR FIX NOTE: Ensure that '../../index.js' exports 'getMoneyCollection' as a named FUNCTION.
-// Example: module.exports = { getMoneyCollection: getMoneyCollectionFunction };
-const { getMoneyCollection } = require('../../index.js'); 
+// **[CORRECCIÓN CLAVE]** Eliminamos la línea problemática para romper la dependencia circular.
+// La colección de MongoDB se inyectará directamente en la función execute() desde index.js.
 
 // Define los IDs de los usuarios que pueden usar el comando de gestión
 const allowedUsers = ['852486349520371744', '1056942076480204801'];
@@ -24,7 +22,7 @@ const jobRewards = [
 
 module.exports = {
     data: new SlashCommandBuilder()
-        // ... (Your SlashCommandBuilder data remains the same)
+        // ... (Tu data sigue igual)
         .setName("law_money")
         .setDescription("Gestiona el sistema de dinero del servidor.")
         .addSubcommand(subcommand =>
@@ -138,20 +136,23 @@ module.exports = {
                 )
         ),
 
+    // **[MODIFICACIÓN CLAVE]** Acepta 'collection' como argumento inyectado desde index.js
+    async execute(interaction, collection) {
+        // **[VALIDACIÓN]** Reemplaza 'const collection = getMoneyCollection();'
+        if (!collection) {
+            await interaction.deferReply({ ephemeral: true });
+            return await interaction.editReply({ content: "❌ Error interno: La conexión a la base de datos no está lista. Inténtalo más tarde.", ephemeral: true });
+        }
 
-    async execute(interaction) {
-        // **[CORRECCIÓN CLAVE 1]** Intenta deferir la respuesta inmediatamente. 
-        // Usamos ephemeral: true para aumentar la velocidad de respuesta, aunque la respuesta final sea pública.
         try {
             await interaction.deferReply({ ephemeral: true });
         } catch (e) {
-            // Si falla, el token expiró (Error 10062). No podemos hacer nada más.
             return; 
         }
 
         try {
-            // Obtener la colección ya conectada
-            const collection = getMoneyCollection(); // THIS LINE IS CAUSING THE ERROR IF NOT EXPORTED CORRECTLY
+            // Ya no es necesario obtener la colección aquí. Viene como argumento.
+            // const collection = getMoneyCollection(); 
 
             const subcommandGroup = interaction.options.getSubcommandGroup();
             const subcommand = interaction.options.getSubcommand();
@@ -182,10 +183,9 @@ module.exports = {
                     const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
                     const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
-                    // **[CORRECCIÓN DE WARNING]** Usamos editReply ya que ya deferimos.
                     return await interaction.editReply({
                         content: `⏰ Ya has reclamado tu recompensa diaria. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
-                        flags: MessageFlags.Ephemeral // Reemplaza ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
 
@@ -202,7 +202,6 @@ module.exports = {
                     .setColor("Gold")
                     .setTimestamp();
 
-                // **[CORRECCIÓN CLAVE 2]** La respuesta final es pública (no tiene flags: 64)
                 await interaction.editReply({ embeds: [embed] });
 
             } else if (subcommand === 'job') {
@@ -215,7 +214,6 @@ module.exports = {
                     const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
                     const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
-                    // **[CORRECCIÓN DE WARNING]** Usamos editReply ya que ya deferimos.
                     return await interaction.editReply({
                         content: `⏰ Ya has completado un trabajo recientemente. Vuelve a intentarlo en ${hoursLeft} hora(s) y ${minutesLeft} minuto(s).`,
                         flags: MessageFlags.Ephemeral
@@ -365,7 +363,7 @@ module.exports = {
                 await interaction.editReply({
                     embeds: [embed],
                     components: [row],
-                    flags: MessageFlags.Ephemeral // La notificación de desafío es privada al inicio
+                    flags: MessageFlags.Ephemeral
                 });
 
             } else if (subcommand === 'rank') {
@@ -518,36 +516,27 @@ module.exports = {
                 }
 
                 const robSuccess = Math.random() < 0.4; // 40% de probabilidad de éxito
-                let robAmount;
                 let newRobberBalance;
                 let newTargetBalance;
                 let embed;
 
-                // Rango de porcentaje a robar de la víctima: 10% a 20%
                 const MIN_ROB_PERCENT = 0.10;
                 const MAX_ROB_PERCENT = 0.20;
 
-                // Rango de porcentaje de penalización del ladrón: 15% a 30%
                 const MIN_PENALTY_PERCENT = 0.15;
                 const MAX_PENALTY_PERCENT = 0.30;
-                // Penalización mínima garantizada (para que los balances bajos sigan sintiendo el castigo)
                 const MIN_FLAT_PENALTY = 100;
 
 
                 if (robSuccess) {
-                    // 1. Calcula el porcentaje aleatorio a robar (entre 10% y 20%)
                     const robPercentage = Math.random() * (MAX_ROB_PERCENT - MIN_ROB_PERCENT) + MIN_ROB_PERCENT;
-
-                    // 2. Calcula la cantidad real basada en el balance de la VÍCTIMA
                     let robAmount = Math.floor(targetData.balance * robPercentage);
 
-                    // Aseguramos que la cantidad robada no sea cero si el porcentaje es pequeño
                     if (robAmount < 1) robAmount = 1;
 
                     newRobberBalance = userData.balance + robAmount;
                     newTargetBalance = targetData.balance - robAmount;
 
-                    // Si la víctima queda con balance negativo (teóricamente no debería pasar si tiene más de 100)
                     if (newTargetBalance < 0) newTargetBalance = 0;
 
                     await collection.updateOne({ userId }, { $set: { balance: newRobberBalance } });
@@ -563,22 +552,16 @@ module.exports = {
                         .setColor("Green")
                         .setTimestamp();
                 } else {
-                    // 1. Calcula el porcentaje aleatorio de penalización (entre 15% y 30%)
                     const penaltyPercentage = Math.random() * (MAX_PENALTY_PERCENT - MIN_PENALTY_PERCENT) + MIN_PENALTY_PERCENT;
-
-                    // 2. Calcula la cantidad real basada en el balance del LADRÓN
                     let penaltyAmount = Math.floor(userData.balance * penaltyPercentage);
 
-                    // 3. Aplica una penalización mínima si la cantidad calculada es demasiado baja
                     if (penaltyAmount < MIN_FLAT_PENALTY) {
                         penaltyAmount = MIN_FLAT_PENALTY;
                     }
 
                     newRobberBalance = userData.balance - penaltyAmount;
 
-                    // Evita que el balance del ladrón sea negativo
                     if (newRobberBalance < 0) {
-                        // La penalización real es solo lo que le quedaba al usuario
                         penaltyAmount = userData.balance;
                         newRobberBalance = 0;
                     }
@@ -599,7 +582,6 @@ module.exports = {
                 await interaction.editReply({ embeds: [embed] });
             }
         } catch (error) {
-            // **[CORRECCIÓN CLAVE 3]** Ya que deferimos, siempre usamos editReply aquí.
             console.error("Error en el comando law_money:", error);
             await interaction.editReply({
                 content: "❌ Ha ocurrido un error interno. Inténtalo de nuevo más tarde o contacta a un administrador.",
@@ -608,20 +590,24 @@ module.exports = {
         }
     },
 
-    async handleButtonInteraction(interaction) {
+    // **[MODIFICACIÓN CLAVE]** Acepta 'collection' como argumento inyectado desde index.js
+    async handleButtonInteraction(interaction, collection) {
         if (!interaction.isButton() || !interaction.customId.startsWith('game_')) return;
 
-        // **[CORRECCIÓN CLAVE 1]** Deferir el botón inmediatamente
+        // **[VALIDACIÓN]** Reemplaza 'const collection = getMoneyCollection();'
+        if (!collection) {
+            await interaction.deferReply({ ephemeral: true });
+            return await interaction.editReply({ content: "❌ Error interno: La conexión a la base de datos no está lista. Por favor, inicia una nueva apuesta." });
+        }
+
         try {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         } catch (e) {
             return;
         }
 
-        // Descomponer el customId.
         const parts = interaction.customId.split('_');
 
-        // Validar el formato del customId
         if (parts.length !== 6) {
             return await interaction.editReply({
                 content: "❌ Hubo un error procesando la apuesta. Por favor, inicia una nueva."
@@ -632,9 +618,7 @@ module.exports = {
         const amount = parseInt(amountStr);
         const number = parseInt(numberStr);
 
-        // Obtener el ID del usuario que hizo clic
         const clickedUserId = interaction.user.id;
-        // Verificar si el usuario que hizo clic es el oponente.
         if (clickedUserId !== opponentId) {
             return await interaction.editReply({
                 content: "❌ Esta apuesta no es para ti."
@@ -642,22 +626,19 @@ module.exports = {
         }
 
         try {
-            // Obtener la colección ya conectada
-            const collection = getMoneyCollection();
+            // Ya no es necesario obtener la colección aquí. Viene como argumento.
+            // const collection = getMoneyCollection();
 
             const challengerData = await collection.findOne({ userId: challengerId });
             const opponentData = await collection.findOne({ userId: opponentId });
 
-            // Validar fondos y usuarios
             if (!challengerData || challengerData.balance < amount || !opponentData || opponentData.balance < amount) {
-                // Si falla, removemos los botones y notificamos.
                 await interaction.message.edit({ components: [] });
                 return await interaction.editReply({
                     content: "❌ Uno de los jugadores no tiene suficientes monedas para continuar con la apuesta."
                 });
             }
 
-            // Lógica para el botón de rechazo
             if (action === 'decline') {
                 const declineEmbed = new EmbedBuilder()
                     .setTitle('❌ Apuesta Rechazada')
@@ -668,7 +649,6 @@ module.exports = {
                 return await interaction.editReply({ content: '✅ Has rechazado la apuesta.' });
             }
 
-            // Lógica del juego
             const isEven = number % 2 === 0;
             const opponentGuessEven = action === 'par';
 
@@ -692,15 +672,12 @@ module.exports = {
                 resultMessage = `❌ ¡Derrota! **${loserUser.displayName}** se ha equivocado. El número era **${number}** y es ${isEven ? 'PAR' : 'IMPAR'}.`;
             }
 
-            // Actualizar balances
             await collection.updateOne({ userId: winnerId }, { $inc: { balance: amount } });
             await collection.updateOne({ userId: loserId }, { $inc: { balance: -amount } });
 
-            // Recuperar balances actualizados
             const newWinnerData = await collection.findOne({ userId: winnerId });
             const newLoserData = await collection.findOne({ userId: loserId });
 
-            // Crear y enviar embed del resultado
             const resultEmbed = new EmbedBuilder()
                 .setTitle('🎲 Resultado de la Apuesta')
                 .setDescription(resultMessage)
@@ -711,10 +688,8 @@ module.exports = {
                 .setColor(isEven ? 'LuminousVividPink' : 'DarkVividPink')
                 .setTimestamp();
 
-            // Editar el mensaje original (público)
             await interaction.message.edit({ embeds: [resultEmbed], components: [] });
             
-            // Responder a la interacción del botón (privado)
             await interaction.editReply({ content: '✅ La apuesta ha sido procesada.' });
 
         } catch (error) {
