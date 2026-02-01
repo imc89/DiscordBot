@@ -133,14 +133,18 @@ if (!TOKEN) {
     console.error("❌ ERROR: No se encontró DISCORD_TOKEN en Render.");
 } else {
     console.log("DEBUG: Token detectado, llamando a client.login()...");
-    client.login(TOKEN)
-        .then(() => {
-            console.log(`✅ ✅ ✅ ¡CONECTADO! Bot: ${client.user.tag}`);
-        })
-        .catch(err => {
-            console.error("❌ ERROR CRÍTICO DE DISCORD:");
-            console.error(err);
+    // Intenta conectar PRIMERO
+    client.login(process.env.DISCORD_TOKEN).then(() => {
+        console.log("✅ Discord conectado");
+        // Solo cuando el bot esté listo, arranca el servidor web
+        app.listen(port, '0.0.0.0', () => {
+            console.log(`✅ Servidor Web en puerto ${port}`);
         });
+    }).catch(err => {
+        console.error("❌ Fallo de login:", err);
+        // Arranca el server aunque falle el bot para que Render no de error de puerto
+        app.listen(port, '0.0.0.0', () => { });
+    });
 }
 
 // Auto-ping para que Render no duerma el bot
