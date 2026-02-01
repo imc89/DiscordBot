@@ -122,14 +122,25 @@ if (fs.existsSync(eventsPath)) {
 // ========================
 // 7. LOGIN Y AUTO-PING
 // ========================
+// ========================
+// 7. LOGIN (MOVIDO ARRIBA PARA TEST)
+// ========================
 const TOKEN = process.env.DISCORD_TOKEN;
 
+console.log("DEBUG: Iniciando proceso de conexión...");
+
 if (!TOKEN) {
-    console.error("❌ ERROR: No se encontró DISCORD_TOKEN en las variables de entorno de Render.");
+    console.error("❌ ERROR: No se encontró DISCORD_TOKEN en Render.");
 } else {
+    console.log("DEBUG: Token detectado, llamando a client.login()...");
     client.login(TOKEN)
-        .then(() => console.log(`✅ Bot conectado como ${client.user.tag}`))
-        .catch(err => console.error("❌ Error de login en Discord:", err));
+        .then(() => {
+            console.log(`✅ ✅ ✅ ¡CONECTADO! Bot: ${client.user.tag}`);
+        })
+        .catch(err => {
+            console.error("❌ ERROR CRÍTICO DE DISCORD:");
+            console.error(err);
+        });
 }
 
 // Auto-ping para que Render no duerma el bot
