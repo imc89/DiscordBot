@@ -1,28 +1,17 @@
-// ========================
-// 1. IMPORTACIÓN DE LIBRERÍAS
-// ========================
+// index.js (Modified)
+// Importa las librerías necesarias de Node.js.
 require("dotenv").config();
-const { Client, GatewayIntentBits, Collection, Events } = require("discord.js");
+const { Client, GatewayIntentBits, Collection, Events } = require("discord.js"); // Add "Events" here
 const path = require('path');
 const fs = require('fs');
-const express = require('express'); // IMPORTANTE: Importar antes de usar
+const express = require('express');
+
+// Import the command directly
+const lawMoneyCommand = require('./src/commands/money.js');
+const lawBuyCommand = require('./src/commands/buy.js'); // **<-- ESTO ES LO QUE FALTA**
 
 // ========================
-// 2. INICIALIZACIÓN DE EXPRESS (Para Render)
-// ========================
-const app = express();
-const port = process.env.PORT || 10000;
-
-app.get('/', (req, res) => {
-    res.send('Bot is running and healthy!');
-});
-
-app.listen(port, '0.0.0.0', () => {
-    console.log(`✅ Servidor Web escuchando en puerto ${port}`);
-});
-
-// ========================
-// 3. CONFIGURACIÓN DEL BOT
+// Bot Configuration
 // ========================
 const client = new Client({
     intents: [
@@ -34,123 +23,153 @@ const client = new Client({
     ]
 });
 
-// Carga de comandos manual (los que importaste directamente)
-const lawMoneyCommand = require('./src/commands/money.js');
-const lawBuyCommand = require('./src/commands/buy.js');
-
+// ========================
+// Collections
+// ========================
 client.commands = new Collection();
 client.cooldowns = new Collection();
 
 // ========================
-// 4. CARGA DINÁMICA DE COMANDOS
+// Load Commands
 // ========================
 const commandsPath = path.join(__dirname, 'src', 'commands');
-if (fs.existsSync(commandsPath)) {
-    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-    for (const file of commandFiles) {
-        const filePath = path.join(commandsPath, file);
-        const command = require(filePath);
-        if ('data' in command && 'execute' in command) {
-            client.commands.set(command.data.name, command);
-        } else {
-            console.warn(`[WARNING] El comando en ${filePath} no tiene las propiedades "data" o "execute".`);
-        }
+for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
+    if ('data' in command && 'execute' in command) {
+        client.commands.set(command.data.name, command);
+    } else {
+        console.warn(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
     }
 }
 
 // ========================
-// 5. MANEJO DE INTERACCIONES
+// Add the InteractionCreate event listener here
 // ========================
 client.on(Events.InteractionCreate, async interaction => {
-    // Comandos de Barra (Slash Commands)
+    // Handle slash commands
     if (interaction.isChatInputCommand()) {
         const command = client.commands.get(interaction.commandName);
-        if (!command) return;
-
+        if (!command) {
+            console.error(`No command matching ${interaction.commandName} was found.`);
+            return;
+        }
         try {
             await command.execute(interaction);
         } catch (error) {
             console.error(error);
-            const msg = { content: 'Hubo un error al ejecutar el comando.', ephemeral: true };
-            if (interaction.replied || interaction.deferred) await interaction.followUp(msg);
-            else await interaction.reply(msg);
-        }
-    }
-
-    // Botones
-    if (interaction.isButton()) {
-        const { customId } = interaction;
-        if (customId.startsWith('game_') || customId.startsWith('buy_')) {
-            try {
-                await lawMoneyCommand.handleButtonInteraction(interaction);
-            } catch (error) {
-                console.error("Error en botón:", error);
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+            } else {
+                await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
             }
         }
     }
 
-    // Select Menus
+    // ADDED: Handle button interactions
+    if (interaction.isButton()) {
+        const customId = interaction.customId;
+
+        // 1. Botones de los comandos 'money' y 'buy'
+        if (customId.startsWith('game_') || customId.startsWith('buy_')) {
+            // Asume que lawMoneyCommand tiene el manejo de botones (como en tu ejemplo)
+            try {
+                await lawMoneyCommand.handleButtonInteraction(interaction);
+            } catch (error) {
+                console.error("Error al manejar el botón de lawMoney:", error);
+                // Responde a la interacción para evitar el mensaje de error de Discord
+                if (!interaction.deferred && !interaction.replied) {
+                    await interaction.reply({ content: '❌ Error al procesar este botón.', ephemeral: true }).catch(() => { });
+                }
+            }
+            return;
+        }
+
+        // 2. Botones del comando 'law_chess' (Aceptar/Rechazar)
+        if (customId === 'law_chest_accept' || customId === 'law_chest_decline') {
+
+            // **IMPORTANTE:** La lógica de estos botones se maneja internamente
+            // mediante un Collector dentro del comando /law_chess.
+            // Simplemente necesitamos asegurar que el bot no se cuelgue si el collector ya caducó.
+
+            // Si la interacción llega aquí, el collector ya no está escuchando
+            // o ya se respondió. Respondemos discretamente si aún no se ha hecho.
+            if (!interaction.deferred && !interaction.replied) {
+                await interaction.reply({ content: 'Esta partida ya ha sido gestionada o caducó.', ephemeral: true }).catch(() => { });
+            }
+            return;
+        }
+    }
+
+    // --- Manejo de Interacciones con Select Menus ---
     if (interaction.isStringSelectMenu()) {
+        // Verifica si el customId corresponde a la lógica de law_buy (compra o regalo)
         if (interaction.customId === 'buy_drink_select' || interaction.customId.startsWith('gift_select_')) {
             try {
+                // Llama a la función que maneja el select menu en law_buy.js
                 await lawBuyCommand.handleSelectMenuInteraction(interaction);
             } catch (error) {
-                console.error("Error en Select Menu:", error);
+                console.error("Error al manejar el Select Menu de law_buy:", error);
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({ content: '❌ Hubo un error al procesar esta selección.', ephemeral: true });
+                } else {
+                    await interaction.followUp({ content: '❌ Hubo un error al procesar esta selección.', ephemeral: true });
+                }
             }
         }
     }
 });
 
 // ========================
-// 6. CARGA DE EVENTOS
+// Load Events (now only loads other events)
 // ========================
 const eventsPath = path.join(__dirname, 'src', 'events');
-if (fs.existsSync(eventsPath)) {
-    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js') && file !== 'interactionCreate.js');
-    for (const file of eventFiles) {
-        const filePath = path.join(eventsPath, file);
-        const event = require(filePath);
-        if (event.once) {
-            client.once(event.name, (...args) => event.execute(...args, client));
-        } else {
-            client.on(event.name, (...args) => event.execute(...args, client));
-        }
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js') && file !== 'interactionCreate.js'); // Exclude interactionCreate
+
+for (const file of eventFiles) {
+    const filePath = path.join(eventsPath, file);
+    const event = require(filePath);
+    if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args, client));
+    } else {
+        client.on(event.name, (...args) => event.execute(...args, client));
     }
 }
 
 // ========================
-// 7. LOGIN Y AUTO-PING
+// Web Server for Render
 // ========================
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+    res.send('Bot is running and healthy!');
+});
+
+app.listen(port, () => {
+    console.log(`Web server is listening on port ${port}`);
+});
+
 // ========================
-// 7. LOGIN (MOVIDO ARRIBA PARA TEST)
+// Self-Ping to prevent sleep
 // ========================
-const TOKEN = process.env.DISCORD_TOKEN;
+const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`;
 
-console.log("DEBUG: Iniciando proceso de conexión...");
-
-if (!TOKEN) {
-    console.error("❌ ERROR: No se encontró DISCORD_TOKEN en Render.");
-} else {
-    console.log("DEBUG: Token detectado, llamando a client.login()...");
-    // Intenta conectar PRIMERO
-    client.login(process.env.DISCORD_TOKEN).then(() => {
-        console.log("✅ Discord conectado");
-        // Solo cuando el bot esté listo, arranca el servidor web
-        app.listen(port, '0.0.0.0', () => {
-            console.log(`✅ Servidor Web en puerto ${port}`);
-        });
-    }).catch(err => {
-        console.error("❌ Fallo de login:", err);
-        // Arranca el server aunque falle el bot para que Render no de error de puerto
-        app.listen(port, '0.0.0.0', () => { });
-    });
-}
-
-// Auto-ping para que Render no duerma el bot
-if (process.env.RENDER_EXTERNAL_HOSTNAME) {
-    const url = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`;
+if (keepAliveUrl) {
     setInterval(() => {
-        fetch(url).then(res => console.log(`Self-ping OK: ${res.status}`)).catch(() => { });
-    }, 13 * 60 * 1000); // Cada 13 min
+        fetch(keepAliveUrl)
+            .then(res => {
+                console.log(`Ping ${keepAliveUrl} exitoso, estado de respuesta: ${res.status}`);
+            })
+            .catch(err => {
+                console.error(`Ping fallido: ${err.message}`);
+            });
+    }, 12 * 60 * 1000); // 12 minutes in milliseconds
 }
+
+// ========================
+// Login
+// ========================
+client.login(process.env.DISCORD_TOKEN);
