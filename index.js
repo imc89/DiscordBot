@@ -142,7 +142,7 @@ for (const file of eventFiles) {
 // Web Server for Render
 // ========================
 const app = express();
-const port = process.env.PORT || 10000;
+const port = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
     res.send('Bot is running and healthy!');
