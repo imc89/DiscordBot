@@ -6,10 +6,6 @@ const fs = require('fs');
 const express = require('express');
 const { MongoClient } = require("mongodb"); // Importamos MongoClient para la sincronización
 
-// Import the command directly
-const lawMoneyCommand = require('./src/commands/money.js');
-const lawBuyCommand = require('./src/commands/buy.js');
-
 // ========================
 // Bot Configuration
 // ========================
@@ -39,7 +35,6 @@ async function syncMemberCount(guild) {
 
         const db = dbClient.db("psicosofiaDB"); // Ajusta el nombre de tu DB si es diferente
         const collection_generalData = db.collection("psicosofia");
-        const collection_money = db.collection("money");
 
         await collection_generalData.updateOne(
             { type: "server_stats" },
@@ -125,29 +120,11 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (interaction.isButton()) {
         const customId = interaction.customId;
-        if (customId.startsWith('game_') || customId.startsWith('buy_')) {
-            try {
-                await lawMoneyCommand.handleButtonInteraction(interaction);
-            } catch (error) {
-                console.error("Error al manejar el botón de lawMoney:", error);
-            }
-            return;
-        }
         if (customId === 'law_chest_accept' || customId === 'law_chest_decline') {
             if (!interaction.deferred && !interaction.replied) {
                 await interaction.reply({ content: 'Esta partida ya ha sido gestionada o caducó.', ephemeral: true }).catch(() => { });
             }
             return;
-        }
-    }
-
-    if (interaction.isStringSelectMenu()) {
-        if (interaction.customId === 'buy_drink_select' || interaction.customId.startsWith('gift_select_')) {
-            try {
-                await lawBuyCommand.handleSelectMenuInteraction(interaction);
-            } catch (error) {
-                console.error("Error al manejar el Select Menu de law_buy:", error);
-            }
         }
     }
 });

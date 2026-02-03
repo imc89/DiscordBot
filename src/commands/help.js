@@ -14,21 +14,6 @@ const commandsInfo = {
             { name: '⏲️ /law_timer <tiempo> <tarea>', value: 'Establece un temporizador entre 5 minutos y 1 hora para una tarea específica.' },
         ],
     },
-    'Economia': {
-        description: 'Comandos para gestionar y ganar monedas en el servidor.',
-        commands: [
-            { name: '💰 /law_money balance <@usuario>', value: 'Muestra el balance de monedas de un usuario.' },
-            { name: '🎁 /law_money daily', value: 'Reclama tu recompensa diaria de monedas.' },
-            { name: '💼 /law_money job', value: 'Realiza un pequeño trabajo para ganar o perder monedas.' },
-            { name: '💸 /law_money transfer <@usuario> <cantidad>', value: 'Transfiere monedas a otro usuario.' },
-            { name: '🎲 /law_money game <@usuario> <numero> <cantidad>', value: 'Desafía a un usuario a una apuesta de PAR/IMPAR.' },
-            { name: '🎰 /law_money slot <cantidad>', value: 'Juega a las tragamonedas para ganar o perder monedas.' },
-            { name: '🤫 /law_money rob <@usuario>', value: 'Intenta robarle a otro usuario.' },
-            { name: '🏆 /law_money rank', value: 'Muestra el ranking de los usuarios más ricos.' },
-            { name: '🍹 /law_buy shop', value: 'Abre la tienda para comprar bebidas virtuales para ti.' }, 
-            { name: '🤝 /law_buy invite <@usuario>', value: 'Invita a un usuario a una bebida pagada por ti.' }, 
-        ],
-    },
     'Moderacion': {
         description: 'Comandos que solo el staff puede usar para mantener el orden.',
         commands: [
