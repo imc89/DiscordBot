@@ -29,25 +29,44 @@ const dbClient = new MongoClient(uri);
 async function syncMemberCount(guild) {
     if (!guild) return;
     try {
-        // Nos aseguramos de tener la lista de miembros actualizada
-        const members = await guild.members.fetch();
-        const humanCount = members.filter(m => !m.user.bot).size;
+        // 1. Buscamos a todos los miembros para tener datos frescos
+        // Nota: Asegúrate de tener 'GUILD_PRESENCES' y 'GUILD_MEMBERS' intents activados en tu bot
+        const members = await guild.members.fetch({ withPresences: true });
 
-        const db = dbClient.db("psicosofiaDB"); // Ajusta el nombre de tu DB si es diferente
+        // 2. Desglosamos las estadísticas
+        const totalMembers = members.size;
+        const botCount = members.filter(m => m.user.bot).size;
+        const humanCount = totalMembers - botCount;
+
+        // Usuarios conectados (Online, Idle, DND) - Excluyendo Offline
+        const onlineHumans = members.filter(m =>
+            !m.user.bot &&
+            m.presence &&
+            m.presence.status !== 'offline'
+        ).size;
+
+        const db = dbClient.db("psicosofiaDB");
         const collection_generalData = db.collection("psicosofia");
 
+        // 3. Guardamos un objeto más robusto
         await collection_generalData.updateOne(
             { type: "server_stats" },
             {
                 $set: {
-                    totalHumans: humanCount,
                     serverName: guild.name,
+                    totalMembers: totalMembers,
+                    totalHumans: humanCount,
+                    totalBots: botCount,
+                    onlineHumans: onlineHumans,
+                    boostLevel: guild.premiumTier,
+                    boostCount: guild.premiumSubscriptionCount,
                     lastUpdate: new Date()
                 }
             },
             { upsert: true }
         );
-        console.log(`[DATABASE] Usuarios reales actualizados: ${humanCount}`);
+
+        console.log(`[DATABASE] Stats sincronizadas para ${guild.name}: ${humanCount} humanos (${onlineHumans} online) y ${botCount} bots.`);
     } catch (error) {
         console.error("Error al sincronizar el contador:", error);
     }
