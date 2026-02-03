@@ -23,7 +23,6 @@ const client = new Client({
     ]
 });
 
-
 // Configuración de MongoDB
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}/?retryWrites=true&w=majority&appName=Cluster0`;
 const dbClient = new MongoClient(uri);
