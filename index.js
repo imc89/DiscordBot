@@ -29,37 +29,40 @@ const dbClient = new MongoClient(uri);
 async function syncMemberCount(guild) {
     if (!guild) return;
     try {
-        // 1. Buscamos a todos los miembros para tener datos frescos
-        // Forzamos la descarga de TODOS los miembros con sus estados de conexión
-        const members = await guild.members.fetch({ withPresences: true, force: true });
+        // 1. Forzamos la descarga de miembros. 
+        // En servidores grandes, esto asegura que Discord envíe los paquetes de presencia.
+        const members = await guild.members.fetch({ 
+            withPresences: true, 
+            force: true 
+        });
 
-        // 2. Desglosamos las estadísticas
-        const totalMembers = members.size;
+        // 2. Diagnóstico rápido en consola para que veas qué pasa
+        const totalFetched = members.size;
+        const withPresence = members.filter(m => m.presence !== null).size;
+        console.log(`[DEBUG] Miembros en cache: ${totalFetched} | Con presencia detectada: ${withPresence}`);
+
+        // 3. Conteo desglosado
         const botCount = members.filter(m => m.user.bot).size;
         const humanCount = totalMembers - botCount;
 
-        // Usuarios conectados (Online, Idle, DND) - Excluyendo Offline
-        const onlineHumans = members.filter(m =>
-            !m.user.bot &&
-            m.presence &&
-            ['online', 'idle', 'dnd'].includes(m.presence.status)
+        // Filtramos humanos que NO estén offline
+        const onlineHumans = members.filter(m => 
+            !m.user.bot && 
+            m.presence && 
+            m.presence.status !== 'offline'
         ).size;
 
+        // 4. Actualización en MongoDB
         const db = dbClient.db("psicosofiaDB");
-        const collection_generalData = db.collection("psicosofia");
-
-        // 3. Guardamos un objeto más robusto
-        await collection_generalData.updateOne(
+        await db.collection("psicosofia").updateOne(
             { type: "server_stats" },
             {
                 $set: {
                     serverName: guild.name,
-                    totalMembers: totalMembers,
                     totalHumans: humanCount,
                     totalBots: botCount,
-                    onlineHumans: onlineHumans,
+                    onlineHumans: onlineHumans, // Aquí ya debería darte el número real (ej. 136)
                     boostLevel: guild.premiumTier,
-                    boostCount: guild.premiumSubscriptionCount,
                     lastUpdate: new Date()
                 }
             },
