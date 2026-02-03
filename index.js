@@ -38,16 +38,17 @@ async function syncMemberCount(guild) {
         const humanCount = members.filter(m => !m.user.bot).size;
 
         const db = dbClient.db("psicosofiaDB"); // Ajusta el nombre de tu DB si es diferente
-        const collection = db.collection("psicosofia");
+        const collection_generalData = db.collection("psicosofia");
+        const collection_money = db.collection("money");
 
-        await collection.updateOne(
+        await collection_generalData.updateOne(
             { type: "server_stats" },
-            { 
-                $set: { 
+            {
+                $set: {
                     totalHumans: humanCount,
                     serverName: guild.name,
-                    lastUpdate: new Date() 
-                } 
+                    lastUpdate: new Date()
+                }
             },
             { upsert: true }
         );
@@ -86,7 +87,7 @@ for (const file of commandFiles) {
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
     await dbClient.connect();
-    
+
     // Sincronización inicial al encender el bot
     const mainGuild = client.guilds.cache.first();
     if (mainGuild) await syncMemberCount(mainGuild);

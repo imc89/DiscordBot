@@ -58,7 +58,7 @@ module.exports = {
     async handleShopCommand(interaction) {
         try {
             await client.connect();
-            const db = client.db("discord_bot");
+            const db = client.db("psicosofiaDB");
             const collection = db.collection("money");
             const userId = interaction.user.id;
             const userData = await collection.findOne({ userId });
@@ -114,7 +114,7 @@ module.exports = {
 
         try {
             await client.connect();
-            const db = client.db("discord_bot");
+            const db = client.db("psicosofiaDB");
             const collection = db.collection("money");
             const userData = await collection.findOne({ userId: inviter.id });
             const currentBalance = userData ? userData.balance : 0;
@@ -187,7 +187,7 @@ module.exports = {
 
         try {
             await client.connect();
-            const db = client.db("discord_bot");
+            const db = client.db("psicosofiaDB");
             const collection = db.collection("money");
             const userId = interaction.user.id;
             let userData = await collection.findOne({ userId });
@@ -260,7 +260,7 @@ module.exports = {
 
         try {
             await client.connect();
-            const db = client.db("discord_bot");
+            const db = client.db("psicosofiaDB");
             const collection = db.collection("money");
 
             const userId = inviter.id; // El que paga es el invitador
