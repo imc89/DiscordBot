@@ -30,8 +30,8 @@ async function syncMemberCount(guild) {
     if (!guild) return;
     try {
         // 1. Buscamos a todos los miembros para tener datos frescos
-        // Nota: Asegúrate de tener 'GUILD_PRESENCES' y 'GUILD_MEMBERS' intents activados en tu bot
-        const members = await guild.members.fetch({ withPresences: true });
+        // Forzamos la descarga de TODOS los miembros con sus estados de conexión
+        const members = await guild.members.fetch({ withPresences: true, force: true });
 
         // 2. Desglosamos las estadísticas
         const totalMembers = members.size;
@@ -42,7 +42,7 @@ async function syncMemberCount(guild) {
         const onlineHumans = members.filter(m =>
             !m.user.bot &&
             m.presence &&
-            m.presence.status !== 'offline'
+            ['online', 'idle', 'dnd'].includes(m.presence.status)
         ).size;
 
         const db = dbClient.db("psicosofiaDB");
