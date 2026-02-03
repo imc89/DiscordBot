@@ -38,8 +38,8 @@ async function syncMemberCount(guild) {
         const members = await guild.members.fetch();
         const humanCount = members.filter(m => !m.user.bot).size;
 
-        const db = dbClient.db("test"); // Ajusta el nombre de tu DB si es diferente
-        const collection = db.collection("money");
+        const db = dbClient.db("psicosofiaDB"); // Ajusta el nombre de tu DB si es diferente
+        const collection = db.collection("psicosofia");
 
         await collection.updateOne(
             { type: "server_stats" },

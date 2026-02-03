@@ -5,12 +5,9 @@ const {
     StringSelectMenuOptionBuilder,
     ActionRowBuilder,
 } = require("discord.js");
-const { MongoClient } = require("mongodb");
 const path = require('path');
 
-// Configura tu cadena de conexión a MongoDB
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_USER}.patcutg.mongodb.net/?retryWrites=true&w=majority&appName=${process.env.DB_USER}`;
-const client = new MongoClient(uri);
+
 
 // Definición de las bebidas disponibles
 const drinks = [
