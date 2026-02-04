@@ -31,9 +31,9 @@ async function syncMemberCount(guild) {
     try {
         // 1. Forzamos la descarga de miembros. 
         // En servidores grandes, esto asegura que Discord envíe los paquetes de presencia.
-        const members = await guild.members.fetch({ 
-            withPresences: true, 
-            force: true 
+        const members = await guild.members.fetch({
+            withPresences: true,
+            force: true
         });
 
         // 2. Diagnóstico rápido en consola para que veas qué pasa
@@ -46,9 +46,9 @@ async function syncMemberCount(guild) {
         const humanCount = totalMembers - botCount;
 
         // Filtramos humanos que NO estén offline
-        const onlineHumans = members.filter(m => 
-            !m.user.bot && 
-            m.presence && 
+        const onlineHumans = members.filter(m =>
+            !m.user.bot &&
+            m.presence &&
             m.presence.status !== 'offline'
         ).size;
 
@@ -175,12 +175,25 @@ const port = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('Bot is running and healthy!'));
 app.listen(port, () => console.log(`Web server listening on port ${port}`));
 
+const KEEP_ALIVE_URL = 'https://psicosofia.onrender.com';
+
+setInterval(async () => {
+    try {
+        const res = await fetch(KEEP_ALIVE_URL);
+        console.log(`[KEEP ALIVE] Ping a psicosofia.onrender.com → ${res.status}`);
+    } catch (err) {
+        console.error(`[KEEP ALIVE] Error al hacer ping: ${err.message}`);
+    }
+}, 14 * 60 * 1000);
+
 const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`;
 if (keepAliveUrl) {
     setInterval(() => {
         fetch(keepAliveUrl)
             .then(res => console.log(`Ping exitoso: ${res.status}`))
             .catch(err => console.error(`Ping fallido: ${err.message}`));
+        fetch(KEEP_ALIVE_URL).then(res => console.log(`Ping exitoso: ${res.status}`))
+            .catch(err => console.error(`Ping fallido: ${err.message}`));;
     }, 12 * 60 * 1000);
 }
 
