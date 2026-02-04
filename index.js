@@ -42,9 +42,10 @@ async function syncMemberCount(guild) {
         console.log(`[DEBUG] Miembros en cache: ${totalFetched} | Con presencia detectada: ${withPresence}`);
 
         // 3. Conteo desglosado
+        const totalMembers = members.size;
         const botCount = members.filter(m => m.user.bot).size;
         const humanCount = totalMembers - botCount;
-
+        
         // Filtramos humanos que NO estén offline
         const onlineHumans = members.filter(m =>
             !m.user.bot &&
