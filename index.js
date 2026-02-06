@@ -45,7 +45,7 @@ async function syncMemberCount(guild) {
         const totalMembers = members.size;
         const botCount = members.filter(m => m.user.bot).size;
         const humanCount = totalMembers - botCount;
-        
+
         // Filtramos humanos que NO estén offline
         const onlineHumans = members.filter(m =>
             !m.user.bot &&
@@ -64,6 +64,7 @@ async function syncMemberCount(guild) {
                     totalBots: botCount,
                     onlineHumans: onlineHumans, // Aquí ya debería darte el número real (ej. 136)
                     boostLevel: guild.premiumTier,
+                    boostNumber: guild.premiumSubscriptionCount,
                     lastUpdate: new Date()
                 }
             },
