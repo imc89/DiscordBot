@@ -15,7 +15,8 @@ const client = new Client({
         GatewayIntentBits.GuildMembers, // Requerido para ver la lista de miembros
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.DirectMessages
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.GuildPresences
     ]
 });
 
@@ -52,6 +53,8 @@ async function syncMemberCount(guild) {
             m.presence &&
             m.presence.status !== 'offline'
         ).size;
+
+        console.log("holaaaaonlineHumans:", onlineHumans);
 
         // 4. Actualización en MongoDB
         const db = dbClient.db("psicosofiaDB");
