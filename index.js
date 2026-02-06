@@ -1,10 +1,10 @@
-// index.js (Actualizado con contador de usuarios reales)
+// index.js (Contador REAL de usuarios + presencias + intervalo)
 require("dotenv").config();
 const { Client, GatewayIntentBits, Collection, Events } = require("discord.js");
-const path = require('path');
-const fs = require('fs');
-const express = require('express');
-const { MongoClient } = require("mongodb"); // Importamos MongoClient para la sincronización
+const path = require("path");
+const fs = require("fs");
+const express = require("express");
+const { MongoClient } = require("mongodb");
 
 // ========================
 // Bot Configuration
@@ -12,7 +12,7 @@ const { MongoClient } = require("mongodb"); // Importamos MongoClient para la si
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers, // Requerido para ver la lista de miembros
+        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.DirectMessages,
@@ -20,43 +20,36 @@ const client = new Client({
     ]
 });
 
-// Configuración de MongoDB
+// ========================
+// MongoDB Configuration
+// ========================
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}/?retryWrites=true&w=majority&appName=Cluster0`;
 const dbClient = new MongoClient(uri);
 
 // ========================
-// Función: Sincronizar Contador de Usuarios (Sin Bots)
+// Función: Sincronizar Contador (SIN bots)
 // ========================
 async function syncMemberCount(guild) {
     if (!guild) return;
+
     try {
-        // 1. Forzamos la descarga de miembros. 
-        // En servidores grandes, esto asegura que Discord envíe los paquetes de presencia.
         const members = await guild.members.fetch({
             withPresences: true,
             force: true
         });
 
-        // 2. Diagnóstico rápido en consola para que veas qué pasa
-        const totalFetched = members.size;
-        const withPresence = members.filter(m => m.presence !== null).size;
-        console.log(`[DEBUG] Miembros en cache: ${totalFetched} | Con presencia detectada: ${withPresence}`);
-
-        // 3. Conteo desglosado
         const totalMembers = members.size;
         const botCount = members.filter(m => m.user.bot).size;
         const humanCount = totalMembers - botCount;
 
-        // Filtramos humanos que NO estén offline
         const onlineHumans = members.filter(m =>
             !m.user.bot &&
             m.presence &&
-            m.presence.status !== 'offline'
+            m.presence.status !== "offline"
         ).size;
 
-        console.log("holaaaaonlineHumans:", onlineHumans);
+        console.log(`[SYNC] ${guild.name} → Humanos: ${humanCount} | Online: ${onlineHumans}`);
 
-        // 4. Actualización en MongoDB
         const db = dbClient.db("psicosofiaDB");
         await db.collection("psicosofia").updateOne(
             { type: "server_stats" },
@@ -65,7 +58,7 @@ async function syncMemberCount(guild) {
                     serverName: guild.name,
                     totalHumans: humanCount,
                     totalBots: botCount,
-                    onlineHumans: onlineHumans, // Aquí ya debería darte el número real (ej. 136)
+                    onlineHumans,
                     boostLevel: guild.premiumTier,
                     boostNumber: guild.premiumSubscriptionCount,
                     lastUpdate: new Date()
@@ -74,9 +67,8 @@ async function syncMemberCount(guild) {
             { upsert: true }
         );
 
-        console.log(`[DATABASE] Stats sincronizadas para ${guild.name}: ${humanCount} humanos (${onlineHumans} online) y ${botCount} bots.`);
     } catch (error) {
-        console.error("Error al sincronizar el contador:", error);
+        console.error("[ERROR] syncMemberCount:", error);
     }
 }
 
@@ -89,69 +81,90 @@ client.cooldowns = new Collection();
 // ========================
 // Load Commands
 // ========================
-const commandsPath = path.join(__dirname, 'src', 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+const commandsPath = path.join(__dirname, "src", "commands");
+const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith(".js"));
 
 for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    const command = require(filePath);
-    if ('data' in command && 'execute' in command) {
+    const command = require(path.join(commandsPath, file));
+    if ("data" in command && "execute" in command) {
         client.commands.set(command.data.name, command);
-    } else {
-        console.warn(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
     }
 }
 
 // ========================
-// Event Listeners para el Contador
+// Client Ready
 // ========================
-
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
     await dbClient.connect();
 
-    // Sincronización inicial al encender el bot
-    const mainGuild = client.guilds.cache.first();
-    if (mainGuild) await syncMemberCount(mainGuild);
+    const guild = client.guilds.cache.first();
+    if (guild) await syncMemberCount(guild);
 });
 
-// Actualizar cuando alguien entra
-client.on(Events.GuildMemberAdd, async (member) => {
+// ========================
+// Eventos de miembros
+// ========================
+client.on(Events.GuildMemberAdd, async member => {
     await syncMemberCount(member.guild);
 });
 
-// Actualizar cuando alguien sale
-client.on(Events.GuildMemberRemove, async (member) => {
+client.on(Events.GuildMemberRemove, async member => {
     await syncMemberCount(member.guild);
 });
+
+// ========================
+// Evento: Cambio de estado (PRESENCE)
+// ========================
+client.on(Events.PresenceUpdate, async (oldPresence, newPresence) => {
+    const guild = newPresence?.guild || oldPresence?.guild;
+    if (!guild) return;
+
+    const user = newPresence?.user || oldPresence?.user;
+    if (!user || user.bot) return;
+
+    const oldStatus = oldPresence?.status ?? "offline";
+    const newStatus = newPresence?.status ?? "offline";
+
+    if (oldStatus === newStatus) return;
+
+    console.log(`[PRESENCE] ${user.username}: ${oldStatus} → ${newStatus}`);
+    await syncMemberCount(guild);
+});
+
+// ========================
+// Intervalo cada 5 minutos
+// ========================
+setInterval(async () => {
+    try {
+        const guild = client.guilds.cache.first();
+        if (!guild) return;
+
+        console.log("[INTERVAL] Sync automático (5 min)");
+        await syncMemberCount(guild);
+    } catch (err) {
+        console.error("[INTERVAL] Error:", err);
+    }
+}, 5 * 60 * 1000);
 
 // ========================
 // Interaction Handling
 // ========================
 client.on(Events.InteractionCreate, async interaction => {
-    if (interaction.isChatInputCommand()) {
-        const command = client.commands.get(interaction.commandName);
-        if (!command) return;
-        try {
-            await command.execute(interaction);
-        } catch (error) {
-            console.error(error);
-            const errorMsg = { content: 'There was an error while executing this command!', ephemeral: true };
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(errorMsg);
-            } else {
-                await interaction.reply(errorMsg);
-            }
-        }
-    }
+    if (!interaction.isChatInputCommand()) return;
 
-    if (interaction.isButton()) {
-        const customId = interaction.customId;
-        if (customId === 'law_chest_accept' || customId === 'law_chest_decline') {
-            if (!interaction.deferred && !interaction.replied) {
-                await interaction.reply({ content: 'Esta partida ya ha sido gestionada o caducó.', ephemeral: true }).catch(() => { });
-            }
-            return;
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
+
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(error);
+        const msg = { content: "Error ejecutando el comando", ephemeral: true };
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp(msg);
+        } else {
+            await interaction.reply(msg);
         }
     }
 });
@@ -159,12 +172,13 @@ client.on(Events.InteractionCreate, async interaction => {
 // ========================
 // Load Other Events
 // ========================
-const eventsPath = path.join(__dirname, 'src', 'events');
-const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js') && file !== 'interactionCreate.js');
+const eventsPath = path.join(__dirname, "src", "events");
+const eventFiles = fs.readdirSync(eventsPath).filter(
+    f => f.endsWith(".js") && f !== "interactionCreate.js"
+);
 
 for (const file of eventFiles) {
-    const filePath = path.join(eventsPath, file);
-    const event = require(filePath);
+    const event = require(path.join(eventsPath, file));
     if (event.once) {
         client.once(event.name, (...args) => event.execute(...args, client));
     } else {
@@ -177,29 +191,22 @@ for (const file of eventFiles) {
 // ========================
 const app = express();
 const port = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('Bot is running and healthy!'));
-app.listen(port, () => console.log(`Web server listening on port ${port}`));
 
-const KEEP_ALIVE_URL = 'https://psicosofia.onrender.com';
+app.get("/", (_, res) => res.send("Bot is running and healthy!"));
+app.listen(port, () => console.log(`🌐 Web server on port ${port}`));
+
+const KEEP_ALIVE_URL = "https://psicosofia.onrender.com";
 
 setInterval(async () => {
     try {
         const res = await fetch(KEEP_ALIVE_URL);
-        console.log(`[KEEP ALIVE] Ping a psicosofia.onrender.com → ${res.status}`);
+        console.log(`[KEEP ALIVE] ${res.status}`);
     } catch (err) {
-        console.error(`[KEEP ALIVE] Error al hacer ping: ${err.message}`);
+        console.error("[KEEP ALIVE] Error:", err.message);
     }
-}, 14 * 60 * 1000);
+}, 12 * 60 * 1000);
 
-const keepAliveUrl = `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`;
-if (keepAliveUrl) {
-    setInterval(() => {
-        fetch(keepAliveUrl)
-            .then(res => console.log(`Ping exitoso: ${res.status}`))
-            .catch(err => console.error(`Ping fallido: ${err.message}`));
-        fetch(KEEP_ALIVE_URL).then(res => console.log(`Ping exitoso: ${res.status}`))
-            .catch(err => console.error(`Ping fallido: ${err.message}`));;
-    }, 12 * 60 * 1000);
-}
-
+// ========================
+// Login
+// ========================
 client.login(process.env.DISCORD_TOKEN);
