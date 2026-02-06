@@ -48,8 +48,6 @@ async function syncMemberCount(guild) {
             m.presence.status !== "offline"
         ).size;
 
-        console.log(`[SYNC] ${guild.name} → Humanos: ${humanCount} | Online: ${onlineHumans}`);
-
         const db = dbClient.db("psicosofiaDB");
         await db.collection("psicosofia").updateOne(
             { type: "server_stats" },
@@ -127,7 +125,6 @@ client.on(Events.PresenceUpdate, async (oldPresence, newPresence) => {
     const newStatus = newPresence?.status ?? "offline";
 
     if (oldStatus === newStatus) return;
-
     console.log(`[PRESENCE] ${user.username}: ${oldStatus} → ${newStatus}`);
     await syncMemberCount(guild);
 });
