@@ -30,26 +30,54 @@ const dbClient = new MongoClient(uri);
 // ========================
 // Función: Sincronizar Contador (ROBUSTA)
 // ========================
-async function syncMemberCount(guild) {
+async function syncMemberCount(guild, forceFetch = false) {
     if (!guild) return;
 
     try {
-        // Intento REAL: fetch completo con presencias
-        const members = await guild.members.fetch({
-            withPresences: true,
-            force: true,
-            time: 30000
-        });
+        let humanCount, botCount, onlineHumans;
+        let method = "CACHE";
 
-        const totalMembers = members.size;
-        const botCount = members.filter(m => m.user.bot).size;
-        const humanCount = totalMembers - botCount;
+        if (forceFetch) {
+            try {
+                // Intento REAL: fetch completo con presencias
+                const members = await guild.members.fetch({
+                    withPresences: true,
+                    force: true,
+                    time: 30000
+                });
 
-        const onlineHumans = members.filter(m =>
-            !m.user.bot &&
-            m.presence &&
-            m.presence.status !== "offline"
-        ).size;
+                const totalMembers = members.size;
+                botCount = members.filter(m => m.user.bot).size;
+                humanCount = totalMembers - botCount;
+
+                onlineHumans = members.filter(m =>
+                    !m.user.bot &&
+                    m.presence &&
+                    m.presence.status !== "offline"
+                ).size;
+                method = "FULL";
+            } catch (error) {
+                if (error.code === "GuildMembersTimeout") {
+                    console.warn("[WARN] syncMemberCount timeout — cayendo a cache");
+                    // Fallback a lógica de cache abajo
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        // Si no es forceFetch O si falló el fetch (fallback)
+        if (method === "CACHE") {
+            const totalMembers = guild.memberCount;
+            botCount = guild.members.cache.filter(m => m.user.bot).size;
+            humanCount = totalMembers - botCount;
+
+            onlineHumans = guild.members.cache.filter(m =>
+                !m.user.bot &&
+                m.presence &&
+                m.presence.status !== "offline"
+            ).size;
+        }
 
         const db = dbClient.db("psicosofiaDB");
         await db.collection("psicosofia").updateOne(
@@ -68,55 +96,10 @@ async function syncMemberCount(guild) {
             { upsert: true }
         );
 
-        console.log(`[SYNC] ✅ FULL: ${humanCount} humans, ${onlineHumans} online`);
+        console.log(`[SYNC] ${method === "FULL" ? "✅ FULL" : "⚠️ CACHE"}: ${humanCount} humans, ${onlineHumans} online`);
 
     } catch (error) {
-        // 🔥 Fallback DEFINITIVO: SOLO CACHE
-        if (error.code === "GuildMembersTimeout") {
-            console.warn("[WARN] syncMemberCount timeout — usando SOLO cache");
-
-            try {
-                const totalMembers = guild.memberCount;
-
-                const botCount = guild.members.cache.filter(
-                    m => m.user.bot
-                ).size;
-
-                const humanCount = totalMembers - botCount;
-
-                const onlineHumans = guild.members.cache.filter(m =>
-                    !m.user.bot &&
-                    m.presence &&
-                    m.presence.status !== "offline"
-                ).size;
-
-                const db = dbClient.db("psicosofiaDB");
-                await db.collection("psicosofia").updateOne(
-                    { type: "server_stats" },
-                    {
-                        $set: {
-                            serverName: guild.name,
-                            totalHumans: humanCount,
-                            totalBots: botCount,
-                            onlineHumans,
-                            boostLevel: guild.premiumTier,
-                            boostNumber: guild.premiumSubscriptionCount,
-                            lastUpdate: new Date()
-                        }
-                    },
-                    { upsert: true }
-                );
-
-                console.log(
-                    `[SYNC] ⚠️ CACHE: ${humanCount} humans, ${onlineHumans} online`
-                );
-
-            } catch (cacheError) {
-                console.error("[ERROR] syncMemberCount cache fallback:", cacheError);
-            }
-        } else {
-            console.error("[ERROR] syncMemberCount:", error);
-        }
+        console.error("[ERROR] syncMemberCount:", error);
     }
 }
 
@@ -148,14 +131,14 @@ client.once(Events.ClientReady, async () => {
     await dbClient.connect();
 
     const guild = client.guilds.cache.first();
-    if (guild) await syncMemberCount(guild);
+    if (guild) await syncMemberCount(guild, true);
 });
 
 // ========================
 // Eventos de miembros
 // ========================
-client.on(Events.GuildMemberAdd, member => syncMemberCount(member.guild));
-client.on(Events.GuildMemberRemove, member => syncMemberCount(member.guild));
+client.on(Events.GuildMemberAdd, member => syncMemberCount(member.guild, true));
+client.on(Events.GuildMemberRemove, member => syncMemberCount(member.guild, true));
 
 // ========================
 // Evento: Presencias
@@ -171,7 +154,7 @@ client.on(Events.PresenceUpdate, async (oldPresence, newPresence) => {
         return;
     }
 
-    await syncMemberCount(guild);
+    await syncMemberCount(guild, false);
 });
 
 // ========================
@@ -182,7 +165,7 @@ setInterval(async () => {
     if (!guild) return;
 
     console.log("[INTERVAL] Sync automático");
-    await syncMemberCount(guild);
+    await syncMemberCount(guild, true);
 }, 5 * 60 * 1000);
 
 // ========================
