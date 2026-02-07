@@ -1,4 +1,4 @@
-// index.js (Contador REAL de usuarios + presencias + fallback)
+// index.js (Contador REAL de usuarios + presencias + fallback seguro)
 require("dotenv").config();
 
 const { Client, GatewayIntentBits, Collection, Events } = require("discord.js");
@@ -28,24 +28,18 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${proce
 const dbClient = new MongoClient(uri);
 
 // ========================
-// Función: Sincronizar Contador
+// Función: Sincronizar Contador (ROBUSTA)
 // ========================
 async function syncMemberCount(guild) {
     if (!guild) return;
 
     try {
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Fetch timeout")), 30000)
-        );
-
-        const members = await Promise.race([
-            guild.members.fetch({
-                withPresences: true,
-                force: true,
-                time: 30000
-            }),
-            timeoutPromise
-        ]);
+        // Intento REAL: fetch completo con presencias
+        const members = await guild.members.fetch({
+            withPresences: true,
+            force: true,
+            time: 30000
+        });
 
         const totalMembers = members.size;
         const botCount = members.filter(m => m.user.bot).size;
@@ -65,7 +59,7 @@ async function syncMemberCount(guild) {
                     serverName: guild.name,
                     totalHumans: humanCount,
                     totalBots: botCount,
-                    onlineHumans: onlineHumans,
+                    onlineHumans,
                     boostLevel: guild.premiumTier,
                     boostNumber: guild.premiumSubscriptionCount,
                     lastUpdate: new Date()
@@ -74,20 +68,22 @@ async function syncMemberCount(guild) {
             { upsert: true }
         );
 
-        console.log(`[SYNC] ✅ ${humanCount} humans, ${onlineHumans} online`);
+        console.log(`[SYNC] ✅ FULL: ${humanCount} humans, ${onlineHumans} online`);
 
     } catch (error) {
-        if (error.message === "Fetch timeout") {
-            console.warn("[WARN] syncMemberCount timeout — usando cache");
+        // 🔥 Fallback DEFINITIVO: SOLO CACHE
+        if (error.code === "GuildMembersTimeout") {
+            console.warn("[WARN] syncMemberCount timeout — usando SOLO cache");
 
             try {
-                const members = await guild.members.fetch({ force: false });
+                const totalMembers = guild.memberCount;
 
-                const totalMembers = members.size;
-                const botCount = members.filter(m => m.user.bot).size;
+                const botCount = guild.members.cache.filter(
+                    m => m.user.bot
+                ).size;
+
                 const humanCount = totalMembers - botCount;
 
-                // 🔥 ONLINE DESDE CACHE (única forma posible)
                 const onlineHumans = guild.members.cache.filter(m =>
                     !m.user.bot &&
                     m.presence &&
@@ -102,7 +98,7 @@ async function syncMemberCount(guild) {
                             serverName: guild.name,
                             totalHumans: humanCount,
                             totalBots: botCount,
-                            onlineHumans: onlineHumans,
+                            onlineHumans,
                             boostLevel: guild.premiumTier,
                             boostNumber: guild.premiumSubscriptionCount,
                             lastUpdate: new Date()
@@ -112,11 +108,11 @@ async function syncMemberCount(guild) {
                 );
 
                 console.log(
-                    `[SYNC] ⚠️ Fallback cache: ${humanCount} humans, ${onlineHumans} online`
+                    `[SYNC] ⚠️ CACHE: ${humanCount} humans, ${onlineHumans} online`
                 );
 
-            } catch (fallbackError) {
-                console.error("[ERROR] syncMemberCount fallback:", fallbackError);
+            } catch (cacheError) {
+                console.error("[ERROR] syncMemberCount cache fallback:", cacheError);
             }
         } else {
             console.error("[ERROR] syncMemberCount:", error);
@@ -171,9 +167,9 @@ client.on(Events.PresenceUpdate, async (oldPresence, newPresence) => {
     const user = newPresence?.user || oldPresence?.user;
     if (!user || user.bot) return;
 
-    const oldStatus = oldPresence?.status ?? "offline";
-    const newStatus = newPresence?.status ?? "offline";
-    if (oldStatus === newStatus) return;
+    if ((oldPresence?.status ?? "offline") === (newPresence?.status ?? "offline")) {
+        return;
+    }
 
     await syncMemberCount(guild);
 });
