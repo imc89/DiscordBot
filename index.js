@@ -33,10 +33,20 @@ async function syncMemberCount(guild) {
     if (!guild) return;
 
     try {
-        const members = await guild.members.fetch({
-            withPresences: true,
-            force: true
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Fetch timeout')), 30000); // 30 seconds
         });
+
+        // Race between fetch and timeout
+        const members = await Promise.race([
+            guild.members.fetch({
+                withPresences: true,
+                force: true,
+                time: 30000 // Discord.js timeout parameter
+            }),
+            timeoutPromise
+        ]);
 
         const totalMembers = members.size;
         const botCount = members.filter(m => m.user.bot).size;
@@ -65,8 +75,42 @@ async function syncMemberCount(guild) {
             { upsert: true }
         );
 
+        console.log(`[SYNC] ✅ ${humanCount} humans, ${onlineHumans} online`);
+
     } catch (error) {
-        console.error("[ERROR] syncMemberCount:", error);
+        if (error.code === 'GuildMembersTimeout' || error.message === 'Fetch timeout') {
+            console.warn("[WARN] syncMemberCount: Fetch timeout - retrying without presences...");
+
+            // Fallback: fetch without presences (faster)
+            try {
+                const members = await guild.members.fetch({ force: false });
+                const totalMembers = members.size;
+                const botCount = members.filter(m => m.user.bot).size;
+                const humanCount = totalMembers - botCount;
+
+                const db = dbClient.db("psicosofiaDB");
+                await db.collection("psicosofia").updateOne(
+                    { type: "server_stats" },
+                    {
+                        $set: {
+                            serverName: guild.name,
+                            totalHumans: humanCount,
+                            totalBots: botCount,
+                            // Keep previous onlineHumans value or set to null
+                            boostLevel: guild.premiumTier,
+                            boostNumber: guild.premiumSubscriptionCount,
+                            lastUpdate: new Date()
+                        }
+                    },
+                    { upsert: true }
+                );
+                console.log(`[SYNC] ⚠️ Partial update: ${humanCount} humans (presences skipped)`);
+            } catch (fallbackError) {
+                console.error("[ERROR] syncMemberCount fallback:", fallbackError);
+            }
+        } else {
+            console.error("[ERROR] syncMemberCount:", error);
+        }
     }
 }
 
