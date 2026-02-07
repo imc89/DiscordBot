@@ -104,7 +104,7 @@ async function syncMemberCount(guild) {
                     },
                     { upsert: true }
                 );
-                console.log(`[SYNC] ⚠️ Partial update: ${humanCount} humans (presences skipped)`);
+                console.log(`[SYNC] ⚠️ Partial update: ${humanCount} humans (presences skipped). ERROR: ${error}`);
             } catch (fallbackError) {
                 console.error("[ERROR] syncMemberCount fallback:", fallbackError);
             }
@@ -169,7 +169,6 @@ client.on(Events.PresenceUpdate, async (oldPresence, newPresence) => {
     const newStatus = newPresence?.status ?? "offline";
 
     if (oldStatus === newStatus) return;
-    console.log(`[PRESENCE] ${user.username}: ${oldStatus} → ${newStatus}`);
     await syncMemberCount(guild);
 });
 
