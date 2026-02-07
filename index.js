@@ -1,5 +1,6 @@
-// index.js (Contador REAL de usuarios + presencias + intervalo)
+// index.js (Contador REAL de usuarios + presencias + fallback)
 require("dotenv").config();
+
 const { Client, GatewayIntentBits, Collection, Events } = require("discord.js");
 const path = require("path");
 const fs = require("fs");
@@ -27,23 +28,21 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${proce
 const dbClient = new MongoClient(uri);
 
 // ========================
-// Función: Sincronizar Contador (SIN bots)
+// Función: Sincronizar Contador
 // ========================
 async function syncMemberCount(guild) {
     if (!guild) return;
 
     try {
-        // Create a timeout promise
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Fetch timeout')), 30000); // 30 seconds
-        });
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Fetch timeout")), 30000)
+        );
 
-        // Race between fetch and timeout
         const members = await Promise.race([
             guild.members.fetch({
                 withPresences: true,
                 force: true,
-                time: 30000 // Discord.js timeout parameter
+                time: 30000
             }),
             timeoutPromise
         ]);
@@ -78,15 +77,22 @@ async function syncMemberCount(guild) {
         console.log(`[SYNC] ✅ ${humanCount} humans, ${onlineHumans} online`);
 
     } catch (error) {
-        if (error.code === 'GuildMembersTimeout' || error.message === 'Fetch timeout') {
-            console.warn("[WARN] syncMemberCount: Fetch timeout - retrying without presences...");
+        if (error.message === "Fetch timeout") {
+            console.warn("[WARN] syncMemberCount timeout — usando cache");
 
-            // Fallback: fetch without presences (faster)
             try {
                 const members = await guild.members.fetch({ force: false });
+
                 const totalMembers = members.size;
                 const botCount = members.filter(m => m.user.bot).size;
                 const humanCount = totalMembers - botCount;
+
+                // 🔥 ONLINE DESDE CACHE (única forma posible)
+                const onlineHumans = guild.members.cache.filter(m =>
+                    !m.user.bot &&
+                    m.presence &&
+                    m.presence.status !== "offline"
+                ).size;
 
                 const db = dbClient.db("psicosofiaDB");
                 await db.collection("psicosofia").updateOne(
@@ -97,7 +103,6 @@ async function syncMemberCount(guild) {
                             totalHumans: humanCount,
                             totalBots: botCount,
                             onlineHumans: onlineHumans,
-                            // Keep previous onlineHumans value or set to null
                             boostLevel: guild.premiumTier,
                             boostNumber: guild.premiumSubscriptionCount,
                             lastUpdate: new Date()
@@ -105,7 +110,11 @@ async function syncMemberCount(guild) {
                     },
                     { upsert: true }
                 );
-                console.log(`[SYNC] ⚠️ Partial update: ${humanCount} humans (presences skipped). ERROR: ${error}`);
+
+                console.log(
+                    `[SYNC] ⚠️ Fallback cache: ${humanCount} humans, ${onlineHumans} online`
+                );
+
             } catch (fallbackError) {
                 console.error("[ERROR] syncMemberCount fallback:", fallbackError);
             }
@@ -125,12 +134,13 @@ client.cooldowns = new Collection();
 // Load Commands
 // ========================
 const commandsPath = path.join(__dirname, "src", "commands");
-const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith(".js"));
-
-for (const file of commandFiles) {
-    const command = require(path.join(commandsPath, file));
-    if ("data" in command && "execute" in command) {
-        client.commands.set(command.data.name, command);
+if (fs.existsSync(commandsPath)) {
+    const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith(".js"));
+    for (const file of commandFiles) {
+        const command = require(path.join(commandsPath, file));
+        if ("data" in command && "execute" in command) {
+            client.commands.set(command.data.name, command);
+        }
     }
 }
 
@@ -148,16 +158,11 @@ client.once(Events.ClientReady, async () => {
 // ========================
 // Eventos de miembros
 // ========================
-client.on(Events.GuildMemberAdd, async member => {
-    await syncMemberCount(member.guild);
-});
-
-client.on(Events.GuildMemberRemove, async member => {
-    await syncMemberCount(member.guild);
-});
+client.on(Events.GuildMemberAdd, member => syncMemberCount(member.guild));
+client.on(Events.GuildMemberRemove, member => syncMemberCount(member.guild));
 
 // ========================
-// Evento: Cambio de estado (PRESENCE)
+// Evento: Presencias
 // ========================
 client.on(Events.PresenceUpdate, async (oldPresence, newPresence) => {
     const guild = newPresence?.guild || oldPresence?.guild;
@@ -168,8 +173,8 @@ client.on(Events.PresenceUpdate, async (oldPresence, newPresence) => {
 
     const oldStatus = oldPresence?.status ?? "offline";
     const newStatus = newPresence?.status ?? "offline";
-
     if (oldStatus === newStatus) return;
+
     await syncMemberCount(guild);
 });
 
@@ -177,15 +182,11 @@ client.on(Events.PresenceUpdate, async (oldPresence, newPresence) => {
 // Intervalo cada 5 minutos
 // ========================
 setInterval(async () => {
-    try {
-        const guild = client.guilds.cache.first();
-        if (!guild) return;
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
 
-        console.log("[INTERVAL] Sync automático (5 min)");
-        await syncMemberCount(guild);
-    } catch (err) {
-        console.error("[INTERVAL] Error:", err);
-    }
+    console.log("[INTERVAL] Sync automático");
+    await syncMemberCount(guild);
 }, 5 * 60 * 1000);
 
 // ========================
@@ -202,30 +203,11 @@ client.on(Events.InteractionCreate, async interaction => {
     } catch (error) {
         console.error(error);
         const msg = { content: "Error ejecutando el comando", ephemeral: true };
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp(msg);
-        } else {
-            await interaction.reply(msg);
-        }
+        interaction.replied || interaction.deferred
+            ? interaction.followUp(msg)
+            : interaction.reply(msg);
     }
 });
-
-// ========================
-// Load Other Events
-// ========================
-const eventsPath = path.join(__dirname, "src", "events");
-const eventFiles = fs.readdirSync(eventsPath).filter(
-    f => f.endsWith(".js") && f !== "interactionCreate.js"
-);
-
-for (const file of eventFiles) {
-    const event = require(path.join(eventsPath, file));
-    if (event.once) {
-        client.once(event.name, (...args) => event.execute(...args, client));
-    } else {
-        client.on(event.name, (...args) => event.execute(...args, client));
-    }
-}
 
 // ========================
 // Web Server & Keep Alive
