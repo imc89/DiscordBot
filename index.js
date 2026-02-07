@@ -96,7 +96,6 @@ async function syncMemberCount(guild, forceFetch = false) {
             { upsert: true }
         );
 
-        console.log(`[SYNC] ${method === "FULL" ? "✅ FULL" : "⚠️ CACHE"}: ${humanCount} humans, ${onlineHumans} online`);
 
     } catch (error) {
         console.error("[ERROR] syncMemberCount:", error);
@@ -115,12 +114,22 @@ client.cooldowns = new Collection();
 const commandsPath = path.join(__dirname, "src", "commands");
 if (fs.existsSync(commandsPath)) {
     const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith(".js"));
+    console.log(`[INIT] Cargando ${commandFiles.length} comandos...`);
     for (const file of commandFiles) {
-        const command = require(path.join(commandsPath, file));
-        if ("data" in command && "execute" in command) {
-            client.commands.set(command.data.name, command);
+        try {
+            const command = require(path.join(commandsPath, file));
+            if ("data" in command && "execute" in command) {
+                client.commands.set(command.data.name, command);
+                console.log(`[INIT] ✅ Comando cargado: ${command.data.name}`);
+            } else {
+                console.warn(`[INIT] ⚠️ El comando en ${file} no tiene "data" o "execute".`);
+            }
+        } catch (err) {
+            console.error(`[INIT] ❌ Error cargando comando ${file}:`, err.message);
         }
     }
+} else {
+    console.error(`[INIT] ❌ No se encontró la carpeta de comandos: ${commandsPath}`);
 }
 
 // ========================
@@ -128,10 +137,17 @@ if (fs.existsSync(commandsPath)) {
 // ========================
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
-    await dbClient.connect();
+    try {
+        await dbClient.connect();
+        console.log("✅ Conectado a MongoDB");
+    } catch (err) {
+        console.error("❌ Error conectando a MongoDB:", err.message);
+    }
 
     const guild = client.guilds.cache.first();
-    if (guild) await syncMemberCount(guild, true);
+    if (guild) {
+        await syncMemberCount(guild, true).catch(err => console.error("❌ Error en sync inicial:", err.message));
+    }
 });
 
 // ========================
@@ -154,7 +170,7 @@ client.on(Events.PresenceUpdate, async (oldPresence, newPresence) => {
         return;
     }
 
-    await syncMemberCount(guild, false);
+    await syncMemberCount(guild, false).catch(err => console.error("❌ Error en PresenceUpdate sync:", err.message));
 });
 
 // ========================
@@ -174,17 +190,29 @@ setInterval(async () => {
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
+    console.log(`[INTERACTION] Recibido: /${interaction.commandName} de ${interaction.user.tag}`);
+
     const command = client.commands.get(interaction.commandName);
-    if (!command) return;
+    if (!command) {
+        console.warn(`[INTERACTION] ⚠️ Comando no encontrado: ${interaction.commandName}`);
+        return;
+    }
 
     try {
         await command.execute(interaction);
+        console.log(`[INTERACTION] ✅ Ejecutado: /${interaction.commandName}`);
     } catch (error) {
-        console.error(error);
+        console.error(`[INTERACTION] ❌ Error en /${interaction.commandName}:`, error);
         const msg = { content: "Error ejecutando el comando", ephemeral: true };
-        interaction.replied || interaction.deferred
-            ? interaction.followUp(msg)
-            : interaction.reply(msg);
+        try {
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp(msg);
+            } else {
+                await interaction.reply(msg);
+            }
+        } catch (replyError) {
+            console.error("[INTERACTION] ❌ Error al enviar mensaje de error:", replyError.message);
+        }
     }
 });
 
