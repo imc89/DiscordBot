@@ -66,7 +66,7 @@ async function syncMemberCount(guild) {
                     serverName: guild.name,
                     totalHumans: humanCount,
                     totalBots: botCount,
-                    onlineHumans,
+                    onlineHumans: onlineHumans,
                     boostLevel: guild.premiumTier,
                     boostNumber: guild.premiumSubscriptionCount,
                     lastUpdate: new Date()
@@ -96,6 +96,7 @@ async function syncMemberCount(guild) {
                             serverName: guild.name,
                             totalHumans: humanCount,
                             totalBots: botCount,
+                            onlineHumans: onlineHumans,
                             // Keep previous onlineHumans value or set to null
                             boostLevel: guild.premiumTier,
                             boostNumber: guild.premiumSubscriptionCount,
