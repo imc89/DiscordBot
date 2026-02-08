@@ -225,18 +225,22 @@ const port = process.env.PORT || 3000;
 app.get("/", (_, res) => res.send("Bot is running and healthy!"));
 app.listen(port, () => console.log(`🌐 Web server on port ${port}`));
 
+// Keep Alive & Self-Ping
+// -----------------------
 const keepAliveUrl = process.env.KEEP_ALIVE_URL || "https://psicosofia.onrender.com";
+const renderExternalUrl = process.env.RENDER_EXTERNAL_URL || "https://discordbot-mx6r.onrender.com";
 
-if (keepAliveUrl) {
-    console.log(`[KEEP ALIVE] Iniciando ping a ${keepAliveUrl}`);
+// URLs a monitorear (evitando duplicados)
+const targets = [...new Set([keepAliveUrl, renderExternalUrl])].filter(url => url);
+
+if (targets.length > 0) {
+    console.log(`[KEEP ALIVE] Iniciando pings a: ${targets.join(", ")}`);
     setInterval(() => {
-        fetch(keepAliveUrl)
-            .then(res => {
-                console.log(`[KEEP ALIVE] Ping ${keepAliveUrl} exitoso, estado: ${res.status}`);
-            })
-            .catch(err => {
-                console.error(`[KEEP ALIVE] Ping fallido: ${err.message}`);
-            });
+        targets.forEach(url => {
+            fetch(url)
+                .then(res => console.log(`[KEEP ALIVE] Ping a ${url}: ${res.status}`))
+                .catch(err => console.error(`[KEEP ALIVE] Error en ${url}: ${err.message}`));
+        });
     }, 12 * 60 * 1000); // 12 minutos
 }
 
