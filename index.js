@@ -225,16 +225,20 @@ const port = process.env.PORT || 3000;
 app.get("/", (_, res) => res.send("Bot is running and healthy!"));
 app.listen(port, () => console.log(`🌐 Web server on port ${port}`));
 
-const KEEP_ALIVE_URL = "https://psicosofia.onrender.com";
+const keepAliveUrl = process.env.KEEP_ALIVE_URL || "https://psicosofia.onrender.com";
 
-setInterval(async () => {
-    try {
-        const res = await fetch(KEEP_ALIVE_URL);
-        console.log(`[KEEP ALIVE] ${res.status}`);
-    } catch (err) {
-        console.error("[KEEP ALIVE] Error:", err.message);
-    }
-}, 12 * 60 * 1000);
+if (keepAliveUrl) {
+    console.log(`[KEEP ALIVE] Iniciando ping a ${keepAliveUrl}`);
+    setInterval(() => {
+        fetch(keepAliveUrl)
+            .then(res => {
+                console.log(`[KEEP ALIVE] Ping ${keepAliveUrl} exitoso, estado: ${res.status}`);
+            })
+            .catch(err => {
+                console.error(`[KEEP ALIVE] Ping fallido: ${err.message}`);
+            });
+    }, 12 * 60 * 1000); // 12 minutos
+}
 
 // ========================
 // Login
