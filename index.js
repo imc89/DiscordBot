@@ -133,6 +133,31 @@ if (fs.existsSync(commandsPath)) {
 }
 
 // ========================
+// Load Events
+// ========================
+const eventsPath = path.join(__dirname, "src", "events");
+if (fs.existsSync(eventsPath)) {
+    // Cargamos todos los eventos EXCEPTO interactionCreate.js (que se maneja aquí abajo)
+    const eventFiles = fs.readdirSync(eventsPath).filter(f => f.endsWith(".js") && f !== "interactionCreate.js");
+    console.log(`[INIT] Cargando ${eventFiles.length} eventos dinámicos...`);
+    for (const file of eventFiles) {
+        try {
+            const event = require(path.join(eventsPath, file));
+            if (event.once) {
+                client.once(event.name, (...args) => event.execute(...args, client));
+            } else {
+                client.on(event.name, (...args) => event.execute(...args, client));
+            }
+            console.log(`[INIT] ✅ Evento cargado: ${event.name}`);
+        } catch (err) {
+            console.error(`[INIT] ❌ Error cargando evento ${file}:`, err.message);
+        }
+    }
+} else {
+    console.warn(`[INIT] ⚠️ No se encontró la carpeta de eventos: ${eventsPath}`);
+}
+
+// ========================
 // Client Ready
 // ========================
 client.once(Events.ClientReady, async () => {
@@ -188,30 +213,73 @@ setInterval(async () => {
 // Interaction Handling
 // ========================
 client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-
-    console.log(`[INTERACTION] Recibido: /${interaction.commandName} de ${interaction.user.tag}`);
-
-    const command = client.commands.get(interaction.commandName);
-    if (!command) {
-        console.warn(`[INTERACTION] ⚠️ Comando no encontrado: ${interaction.commandName}`);
-        return;
+    // 1. Manejo de Slash Commands
+    if (interaction.isChatInputCommand()) {
+        console.log(`[INTERACTION] Recibido: /${interaction.commandName} de ${interaction.user.tag}`);
+        const command = client.commands.get(interaction.commandName);
+        if (!command) {
+            console.warn(`[INTERACTION] ⚠️ Comando no encontrado: ${interaction.commandName}`);
+            return;
+        }
+        try {
+            await command.execute(interaction);
+            console.log(`[INTERACTION] ✅ Ejecutado: /${interaction.commandName}`);
+        } catch (error) {
+            console.error(`[INTERACTION] ❌ Error en /${interaction.commandName}:`, error);
+            const msg = { content: "Error ejecutando el comando", ephemeral: true };
+            try {
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp(msg);
+                } else {
+                    await interaction.reply(msg);
+                }
+            } catch (replyError) {
+                console.error("[INTERACTION] ❌ Error al enviar mensaje de error:", replyError.message);
+            }
+        }
     }
 
-    try {
-        await command.execute(interaction);
-        console.log(`[INTERACTION] ✅ Ejecutado: /${interaction.commandName}`);
-    } catch (error) {
-        console.error(`[INTERACTION] ❌ Error en /${interaction.commandName}:`, error);
-        const msg = { content: "Error ejecutando el comando", ephemeral: true };
-        try {
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(msg);
-            } else {
-                await interaction.reply(msg);
+    // 2. Manejo de Botones (Lógica de money y buy según tu ejemplo)
+    if (interaction.isButton()) {
+        const customId = interaction.customId;
+
+        // Intentamos cargar los comandos si existen (para evitar crash si faltan los archivos)
+        const moneyCmdPath = path.join(__dirname, 'src', 'commands', 'money.js');
+        const buyCmdPath = path.join(__dirname, 'src', 'commands', 'buy.js');
+
+        if (customId.startsWith('game_') || customId.startsWith('buy_')) {
+            if (fs.existsSync(moneyCmdPath)) {
+                try {
+                    const lawMoneyCommand = require(moneyCmdPath);
+                    await lawMoneyCommand.handleButtonInteraction(interaction);
+                } catch (error) {
+                    console.error("Error al manejar el botón de lawMoney:", error);
+                }
             }
-        } catch (replyError) {
-            console.error("[INTERACTION] ❌ Error al enviar mensaje de error:", replyError.message);
+            return;
+        }
+
+        // Botones de law_chess o similares
+        if (customId === 'law_chest_accept' || customId === 'law_chest_decline') {
+            if (!interaction.deferred && !interaction.replied) {
+                await interaction.reply({ content: 'Esta partida ya ha sido gestionada o caducó.', ephemeral: true }).catch(() => { });
+            }
+            return;
+        }
+    }
+
+    // 3. Manejo de Select Menus
+    if (interaction.isStringSelectMenu()) {
+        if (interaction.customId === 'buy_drink_select' || interaction.customId.startsWith('gift_select_')) {
+            const buyCmdPath = path.join(__dirname, 'src', 'commands', 'buy.js');
+            if (fs.existsSync(buyCmdPath)) {
+                try {
+                    const lawBuyCommand = require(buyCmdPath);
+                    await lawBuyCommand.handleSelectMenuInteraction(interaction);
+                } catch (error) {
+                    console.error("Error al manejar el Select Menu de law_buy:", error);
+                }
+            }
         }
     }
 });
