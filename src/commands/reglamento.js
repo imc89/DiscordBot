@@ -5,7 +5,7 @@ const { reglasServidor } = require("../config/rules");
 
 // Instancia única de la API y el modelo
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+const model = genAI.getGenerativeModel({ model: "ggemma-3-12b-it" });
 
 // Reglas y prompt de la IA en una constante para mejor manejo
 const PROMPT_BASE = `
@@ -105,7 +105,7 @@ module.exports = {
                     // Opcional: Podrías notificar al usuario que algunos canales no se pudieron analizar
                 }
             }
-            
+
             // Ordena todos los mensajes por fecha y toma los 50 más recientes
             const sortedUserMessages = allUserMessages.sort((a, b) => b.createdTimestamp - a.createdTimestamp).slice(0, 50);
 
@@ -135,24 +135,24 @@ module.exports = {
             }
 
             const promptFinal = PROMPT_BASE.replace('[MENSAJES_DEL_USUARIO]', textoMensajes);
-            
+
             const result = await model.generateContent(promptFinal);
             const rawResponse = result.response.text();
-            
+
             const jsonMatch = rawResponse.match(/```json\n([\s\S]*?)\n```/);
             if (!jsonMatch) {
                 console.error("La IA no respondió con el formato JSON esperado:", rawResponse);
                 return await interaction.editReply("⚠️ La IA no ha devuelto un formato válido. Por favor, inténtalo de nuevo.");
             }
-            
+
             const respuestaIA = JSON.parse(jsonMatch[1]);
-            
+
             // Lógica para determinar el color del embed y el mensaje de estado
             const embed = new EmbedBuilder()
                 .setTitle(`📜 Análisis de Reglamento para ${targetUser.username}`)
                 .setFooter({ text: "✨ Análisis potenciado por Gemini" })
                 .setTimestamp();
-            
+
             let color;
             let statusText;
             switch (respuestaIA.puntuacion) {
@@ -187,24 +187,24 @@ module.exports = {
                     }
                 }
             }
-            
+
             const correctMessages = totalAnalyzed - infringingMessages;
 
             embed.addFields({
                 name: "📊 Resumen del Análisis",
                 value: `**Mensajes analizados:** ${totalAnalyzed}\n` +
-                       `**Mensajes correctos:** ${correctMessages}\n` +
-                       `**Mensajes que han incumplido normas:** ${infringingMessages}\n` +
-                       `> **Nivel bajo:** ${lowSeverity}\n` +
-                       `> **Nivel medio:** ${mediumSeverity}\n` +
-                       `> **Nivel alto:** ${highSeverity}`
+                    `**Mensajes correctos:** ${correctMessages}\n` +
+                    `**Mensajes que han incumplido normas:** ${infringingMessages}\n` +
+                    `> **Nivel bajo:** ${lowSeverity}\n` +
+                    `> **Nivel medio:** ${mediumSeverity}\n` +
+                    `> **Nivel alto:** ${highSeverity}`
             });
-            
+
             // Añadir campos de infracciones
             if (respuestaIA.infracciones && respuestaIA.infracciones.length > 0) {
                 let infraccionesTexto = "";
                 let evidenciasTexto = "";
-                
+
                 for (const inf of respuestaIA.infracciones) {
                     let contraQuien = inf.contra_quien;
                     if (inf.contra_quien.toLowerCase() !== 'general') {
@@ -214,11 +214,11 @@ module.exports = {
                         }
                     }
                     infraccionesTexto += `- **${inf.regla}** (${inf.gravedad.toUpperCase()}): ${inf.descripcion} (Afecta a: **${contraQuien}**)\n`;
-                    
+
                     if (inf.evidencias && inf.evidencias.length > 0) {
                         evidenciasTexto += `**Infracción**: "${inf.regla}"\n`;
                         for (const evidencia of inf.evidencias) {
-                             evidenciasTexto += `> *${evidencia}*\n`;
+                            evidenciasTexto += `> *${evidencia}*\n`;
                         }
                     }
                 }
@@ -227,12 +227,12 @@ module.exports = {
                     { name: "📄 Evidencias de los Mensajes", value: evidenciasTexto.trim() }
                 );
             } else {
-                 embed.addFields({ name: "✅ Infracciones Detectadas", value: "Ninguna infracción detectada. ¡Genial!" });
+                embed.addFields({ name: "✅ Infracciones Detectadas", value: "Ninguna infracción detectada. ¡Genial!" });
             }
-            
+
             // Añadir recomendación
             embed.addFields({ name: "💡 Recomendación para la Moderación", value: respuestaIA.recomendacion });
-            
+
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
@@ -251,7 +251,7 @@ module.exports = {
             } else if (error.message.includes("Unexpected token")) {
                 errorMessage = "⚠️ La IA no ha respondido en el formato JSON esperado. Esto puede ser un error temporal de la API. Inténtalo de nuevo.";
             }
-            
+
             await interaction.editReply(errorMessage);
         }
     },
