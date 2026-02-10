@@ -5,7 +5,7 @@ const { reglasServidor } = require("../config/rules");
 
 // Instancia única de la API y el modelo
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "ggemma-3-12b-it" });
+const model = genAI.getGenerativeModel({ model: "gemma-3-12b-it" });
 
 // Reglas y prompt de la IA en una constante para mejor manejo
 const PROMPT_BASE = `

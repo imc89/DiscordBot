@@ -3,7 +3,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Inicializa la IA
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+const model = genAI.getGenerativeModel({ model: "gemma-3-12b-it" });
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -14,11 +14,11 @@ module.exports = {
                 .setDescription("El nombre de la persona de la que quieres una cita.")
                 .setRequired(true)
         ),
-    
+
     async execute(interaction) {
         // Responde inmediatamente para evitar el timeout
         await interaction.deferReply();
-        
+
         const name = interaction.options.getString("nombre");
 
         // Prompt para la IA
@@ -26,13 +26,13 @@ module.exports = {
         
         "Cita famosa"
         - Nombre Completo del Autor`;
-        
+
         try {
             // Genera la cita con la IA
             const result = await model.generateContent(prompt);
             const response = result.response;
             let text = response.text().trim();
-            
+
             // Intenta extraer la cita y el autor
             const parts = text.split('\n- ');
             const quoteText = parts[0].replace(/"/g, '').trim();
@@ -47,7 +47,7 @@ module.exports = {
                 )
                 .setFooter({ text: "Esta cita ha sido generada por Gemini." })
                 .setTimestamp();
-            
+
             // Edita la respuesta una vez que la información está lista
             await interaction.editReply({ embeds: [embed] });
 

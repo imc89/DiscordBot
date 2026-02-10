@@ -12,7 +12,7 @@ const { categorias } = require("../config/categories.js");
 // Configuración de Gemini
 // ========================
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+const model = genAI.getGenerativeModel({ model: "gemma-3-12b-it" });
 
 // ========================
 // Lógica de Ayuda (reutilizable)
@@ -34,11 +34,11 @@ async function getRelevantCategory(userQuery, categoryNames) {
         const result = await model.generateContent(prompt);
         const response = result.response;
         let text = response.text().trim();
-        
+
         if (text.startsWith('"') && text.endsWith('"')) {
             text = text.substring(1, text.length - 1);
         }
-        
+
         return text;
     } catch (error) {
         console.error("Error al comunicarse con la API de Gemini:", error);
@@ -74,13 +74,13 @@ module.exports = {
                 .setDescription(`Lo siento, no pude encontrar una categoría relevante para tu consulta: **"${query}"**. Intenta ser más específico.`);
             return interaction.editReply({ embeds: [noMatchEmbed] });
         }
-        
+
         const categoryData = categorias[suggestedCategory];
 
         if (categoryData) {
             const selectOptions = categoryData.canales.map((channelName, index) => {
                 const foundChannel = interaction.guild.channels.cache.find(channel => channel.name === channelName);
-                
+
                 return {
                     label: channelName,
                     value: foundChannel ? foundChannel.id : `not-found-${index}`,
@@ -99,9 +99,9 @@ module.exports = {
                 .setColor("Blue")
                 .setTitle(`💡 Canales sobre: ${suggestedCategory}`)
                 .setDescription(`Puedes hablar sobre **"${query}"** en los siguientes canales. Usa el menú desplegable para ir a ellos.`);
-            
+
             await interaction.editReply({ embeds: [replyEmbed], components: [actionRow] });
-            
+
             // ====================================================================
             // Lógica Local para la Interacción del Menú
             // ====================================================================
@@ -123,7 +123,7 @@ module.exports = {
                     });
                     return;
                 }
-            
+
                 const channel = i.guild.channels.cache.get(selectedValue);
                 if (channel) {
                     await i.followUp({
@@ -139,13 +139,13 @@ module.exports = {
                     interaction.editReply({ content: 'El menú ha expirado.', components: [] }).catch(console.error);
                 }
             });
-            
+
         } else {
             const notFoundEmbed = new EmbedBuilder()
                 .setColor("Yellow")
                 .setTitle("🔍 Categoría no encontrada")
                 .setDescription(`Gemini me sugirió la categoría **"${suggestedCategory}"**, pero no pude encontrarla. Puede que su nombre haya cambiado o el bot no tenga acceso.`);
-            
+
             await interaction.editReply({ embeds: [notFoundEmbed] });
         }
     },
