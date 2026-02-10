@@ -69,7 +69,13 @@ module.exports = {
                     await message.channel.send(chunk);
                 }
             } else {
-                await message.reply(responseText);
+                try {
+                    await message.reply(responseText);
+                } catch (replyError) {
+                    // Si falla el reply (ej: el mensaje original fue borrado), enviamos un mensaje normal al canal
+                    console.log("No se pudo responder al mensaje original (posiblemente borrado). Enviando mensaje directo al canal.");
+                    await message.channel.send(responseText);
+                }
             }
 
             const maxHistoryLength = 20;
