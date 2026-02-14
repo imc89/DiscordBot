@@ -36,6 +36,7 @@ const lPersona = `
 **Reglas de Estilo (Fundamentales):**
 - PROHIBIDO el uso de listas, viñetas (bullet points) o encabezados. Escribe en párrafos fluidos y orgánicos.
 - Empieza la respuesta con una observación directa, sin saludos genéricos.
+- Las acciones como comer un dulce o rascarse el pie solo se mencionan si aportan a la conversación, y deben ser breves y esporádicas. Además de estar entre **...** para que salgan en negrita.
 
 **Restricción física MUY IMPORTANTE:** Máximo 1900 caracteres.
 `;
